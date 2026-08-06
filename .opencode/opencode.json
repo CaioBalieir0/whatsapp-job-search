@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "command": {
+    "setup": {
+      "description": "Generate or refresh profile/job-profile.md from onboarding information",
+      "template": "Use the setup-job-profile skill to run profile onboarding for this WhatsApp job search project. Pass $ARGUMENTS through to the skill, including optional --section <name>. Generate or refresh profile/job-profile.md only after user confirmation."
+    },
+    "search-whatsapp-jobs": {
+      "description": "Search WhatsApp job postings through the n8n webhook",
+      "template": "Use the search-whatsapp-jobs skill to search WhatsApp job postings in this n8n project. Treat $ARGUMENTS as the optional hours value. If $ARGUMENTS is provided, use it as the webhook hours parameter. If it is empty, follow the skill's interactive hours flow. Run the required Docker and webhook workflow, validate output/jobs-email.json, and report lastRun, hoursConsulted, and total."
+    },
+    "filter-whatsapp-jobs": {
+      "description": "Filter WhatsApp job postings against the local job profile",
+      "template": "Use the filter-whatsapp-jobs skill to filter output/jobs-email.json against profile/job-profile.md. Do not read profile/documents/ or any resumes, CVs, LinkedIn exports, or supplemental files while filtering. Write output/filtered-jobs.json with only compatible jobs, preserve sender, text, and timestamp, add send: false to every kept job, never set send: true, do not add reason, do not modify output/jobs-email.json, validate the result, and report sourceTotal, total, and the output path."
+    },
+    "job-search-pipeline": {
+      "description": "Search WhatsApp jobs and then filter them against the local profile",
+      "template": "Run the full WhatsApp job search pipeline in this n8n project. First use the search-whatsapp-jobs skill with $ARGUMENTS as the optional hours value. If $ARGUMENTS is empty, follow the skill's interactive hours flow. After output/jobs-email.json is valid, use the filter-whatsapp-jobs skill to read profile/job-profile.md and create output/filtered-jobs.json. Do not read profile/documents/ during filtering. Validate both outputs and report lastRun, hoursConsulted, sourceTotal, total, and the output paths."
+    }
+  }
+}
