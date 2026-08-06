@@ -19,6 +19,8 @@ The filtering skill reads only `job-profile.md`. Use `/setup` to generate or ref
 4. Review `job-profile.md` after setup and edit anything that does not reflect your current target search.
 5. Ask the agent to filter the jobs after `output/jobs-email.json` has been generated.
 
+Use `/reset profile`, `/reset documents`, or `/reset all` to start fresh. Reset is destructive and requires typing exactly `RESET` before anything is changed.
+
 The filtering skill reads `job-profile.md` and writes compatible jobs to `output/filtered-jobs.json`. Every filtered job starts with `send: false` so sending or applying can be handled later by a separate step.
 
 ## Priority Rules

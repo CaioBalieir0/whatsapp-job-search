@@ -49,6 +49,10 @@ The n8n container mounts `./output` to `/data/output`, so files written by n8n u
 +-- .opencode/
 |   +-- opencode.json
 |   +-- skills/
+|       +-- setup-job-profile/
+|       |   +-- SKILL.md
+|       +-- reset-job-profile/
+|       |   +-- SKILL.md
 |       +-- search-whatsapp-jobs/
 |       |   +-- SKILL.md
 |       +-- filter-whatsapp-jobs/
@@ -67,6 +71,8 @@ The n8n container mounts `./output` to `/data/output`, so files written by n8n u
 | --- | --- |
 | `docker-compose.yml` | Defines the local n8n, Postgres, Redis, and Evolution API stack. |
 | `.opencode/opencode.json` | Registers project commands for opencode. |
+| `.opencode/skills/setup-job-profile/SKILL.md` | Agent workflow for generating or refreshing the local profile. |
+| `.opencode/skills/reset-job-profile/SKILL.md` | Agent workflow for resetting local profile data before running setup again. |
 | `.opencode/skills/search-whatsapp-jobs/SKILL.md` | Agent workflow for running the n8n job-search webhook and validating raw output. |
 | `.opencode/skills/filter-whatsapp-jobs/SKILL.md` | Agent workflow for filtering raw jobs against the local profile. |
 | `output/jobs-email.json` | Raw job-search result written by the n8n workflow. |
@@ -185,6 +191,7 @@ The repository includes project-level opencode skills under `.opencode/skills/`.
 | Skill | Purpose |
 | --- | --- |
 | `setup-job-profile` | Runs `/setup` onboarding and generates or refreshes `profile/job-profile.md` from documents, pasted context, or interview mode. |
+| `reset-job-profile` | Runs `/reset` and clears `profile/job-profile.md`, `profile/documents/`, or both after explicit confirmation. |
 | `search-whatsapp-jobs` | Runs the n8n webhook, validates `output/jobs-email.json`, and reports the search result summary. |
 | `filter-whatsapp-jobs` | Reads `profile/job-profile.md` and `output/jobs-email.json`, keeps compatible jobs, and writes `output/filtered-jobs.json`. |
 
@@ -197,6 +204,7 @@ The repository registers opencode commands in `.opencode/opencode.json`.
 | Command | Usage | Purpose |
 | --- | --- | --- |
 | `/setup` | `/setup` or `/setup --section roles` | Generates or refreshes `profile/job-profile.md` from `profile/documents/`, a pasted CV, or interview mode. |
+| `/reset` | `/reset profile`, `/reset documents`, or `/reset all` | Resets local profile data after exact `RESET` confirmation. |
 | `/search-whatsapp-jobs` | `/search-whatsapp-jobs 24` | Searches WhatsApp jobs through the n8n webhook for the provided number of hours. If no hours are provided, the agent asks which time window to use. |
 | `/filter-whatsapp-jobs` | `/filter-whatsapp-jobs` | Filters `output/jobs-email.json` against `profile/job-profile.md` and writes `output/filtered-jobs.json`. |
 | `/job-search-pipeline` | `/job-search-pipeline 24` | Runs the full flow: search through the webhook, validate raw output, filter against the profile, and validate filtered output. |
