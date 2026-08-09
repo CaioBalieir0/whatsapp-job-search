@@ -62,6 +62,8 @@ This file is the only profile source used by the filtering skill. To generate or
 
 - [Exclude weak or ambiguous matches]
 - Keep only jobs that clearly match this profile.
+- If a job contains both matching technologies and a rejected seniority level, reject it.
+- If a job contains acceptable secondary technologies but does not clearly match a target role, reject it.
 - Exclude jobs when the match is weak or ambiguous.
 - Exclude jobs that match any explicit rejection rule.
 - The filtered output must always set `send: false` for every kept job.
