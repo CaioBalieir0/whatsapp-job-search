@@ -7,18 +7,20 @@ description: Use when the user runs /setup, asks to generate profile/job-profile
 
 ## Overview
 
-Run onboarding for this WhatsApp job search workspace. Collect the user's professional information and generate or refresh `profile/job-profile.md` so `/filter-whatsapp-jobs` can evaluate jobs from `output/jobs-email.json` using one normalized profile file.
+Run onboarding for this WhatsApp job search workspace. Collect the user's professional information and generate or refresh `profile/job-profile.md` so `/filter-whatsapp-jobs` can evaluate jobs from `output/jobs-email.json`. Also generate or refresh `profile/email-body-rules.md` so `/send-job-emails` can write email bodies using user-editable language, tone, and structure preferences.
 
-This skill is for profile setup only. Do not filter jobs, do not call the n8n webhook, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
+This skill is for profile setup only. Do not filter jobs, do not send emails, do not call the n8n webhook, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 
 ## Core Contract
 
 - Source materials are optional and live under `profile/documents/`.
 - `profile/documents/` is free-form; do not require subfolders or a naming convention.
 - The user may also paste a CV, resume, notes, LinkedIn text, or professional context directly into the conversation.
-- The only generated filtering profile is `profile/job-profile.md`.
+- The generated filtering profile is `profile/job-profile.md`.
+- The generated email body preferences file is `profile/email-body-rules.md`.
 - `/filter-whatsapp-jobs` reads only `profile/job-profile.md`; it must not read `profile/documents/`.
-- Before writing `profile/job-profile.md`, present the proposed complete file content and wait for explicit confirmation.
+- `/send-job-emails` reads `profile/job-profile.md` for candidate facts and `profile/email-body-rules.md` for email language, tone, and body structure preferences; it must not read `profile/documents/`.
+- Before writing `profile/job-profile.md` or `profile/email-body-rules.md`, present the proposed complete file content and wait for explicit confirmation.
 - Prefer a clear, specific profile over a broad profile. Weak or ambiguous future matches should be excluded by the filter.
 
 ## Step 0: Welcome And Choose Path
@@ -35,6 +37,8 @@ Accepted section names:
 - `contract`
 - `languages`
 - `rules`
+- `email`
+- `email-body`
 - `all`
 
 If no `--section` argument is provided, scan `profile/documents/**/*` with Glob before greeting the user.
@@ -46,7 +50,7 @@ If `profile/documents/` has files, lead with Path A:
 ```markdown
 ## Welcome To Job Profile Setup
 
-I'll help you build `profile/job-profile.md` so this workspace can filter WhatsApp job postings against your current search preferences.
+I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences.
 
 I found files in `profile/documents/`: [list file paths]. Three ways to start:
 
@@ -64,7 +68,7 @@ If `profile/documents/` is empty or missing, surface Path A as optional:
 ```markdown
 ## Welcome To Job Profile Setup
 
-I'll help you build `profile/job-profile.md` so this workspace can filter WhatsApp job postings against your current search preferences.
+I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences.
 
 Three ways to start:
 
@@ -81,7 +85,7 @@ Wait for the user's choice. If they pick Path A but `profile/documents/` is stil
 
 ## Path A: Documents Folder
 
-Path A reads free-form source materials in `profile/documents/`, cross-references them for consistency, and converts them into `profile/job-profile.md`. It is read-before-write and safe to re-run: do not duplicate content already represented in the profile.
+Path A reads free-form source materials in `profile/documents/`, cross-references them for consistency, and converts them into `profile/job-profile.md` and `profile/email-body-rules.md`. It is read-before-write and safe to re-run: do not duplicate content already represented in the profile files.
 
 Follow these steps exactly in order.
 
@@ -94,14 +98,14 @@ Use Glob with `profile/documents/**/*` to scan the full tree. Print:
 
 [list readable file paths, or "(empty)"]
 
-I will read these and cross-reference before proposing changes to `profile/job-profile.md`.
+I will read these and cross-reference before proposing changes to `profile/job-profile.md` and `profile/email-body-rules.md`.
 ```
 
 If no files are found, stop and tell the user to add a CV, resume, LinkedIn export, notes, or other professional materials directly under `profile/documents/`. Point at `profile/documents/README.md`.
 
-### Step A2: Read Existing Profile
+### Step A2: Read Existing Profile Files
 
-Read `profile/job-profile.md` before extracting anything. Keep it in context throughout Path A.
+Read `profile/job-profile.md` and `profile/email-body-rules.md` before extracting anything. Keep both in context throughout Path A.
 
 You must know what is already present to avoid duplicates and to preserve explicit current preferences.
 
@@ -119,6 +123,7 @@ Extract facts and preferences that help build the profile:
 - Work mode and location preferences.
 - Contract, employment, freelance, schedule, or availability preferences.
 - Language requirements and accepted job-posting languages.
+- Email body language preferences, preferred email language, fallback language behavior, tone, greeting, closing, signature preferences, and attachment wording preferences.
 - Decision rules for weak, ambiguous, or borderline jobs.
 
 For CVs and resumes, extract work history, education, skills, tools, domains, seniority signals, leadership signals, and role direction. Do not copy personal contact details into `profile/job-profile.md` unless they affect job filtering.
@@ -160,9 +165,9 @@ These need to be resolved before I continue. For each one, tell me which version
 
 If no inconsistencies are found, state `No cross-reference issues found.` and continue.
 
-### Step A5: Build Proposed Profile
+### Step A5: Build Proposed Profile Files
 
-Compare extracted content against the existing `profile/job-profile.md`.
+Compare extracted content against the existing `profile/job-profile.md` and `profile/email-body-rules.md`.
 
 Build a complete proposed version of `profile/job-profile.md` using this structure:
 
@@ -171,7 +176,7 @@ Build a complete proposed version of `profile/job-profile.md` using this structu
 
 Use this file to describe which WhatsApp job postings should be kept in `output/filtered-jobs.json`.
 
-This file is the only profile source used by the filtering skill. To generate or refresh it from a CV, LinkedIn export, notes, or an interview flow, run `/setup`.
+This file is the profile source used by the filtering skill. To generate or refresh it from a CV, LinkedIn export, notes, or an interview flow, run `/setup`.
 
 ## Target Roles
 
@@ -213,11 +218,82 @@ This file is the only profile source used by the filtering skill. To generate or
 - The filtered output must always set `send: false` for every kept job.
 ```
 
-Do not leave square-bracket placeholders in the proposed final content unless the user has not provided enough information for that section. If information is missing, ask focused follow-up questions before proposing the final content.
+Build a complete proposed version of `profile/email-body-rules.md` using this structure. Keep the file text in English where possible:
+
+````markdown
+# Email Body Rules
+
+Use this file to customize how `/send-job-emails` writes job application email bodies.
+
+This file controls language, tone, structure, and wording preferences. Candidate facts such as role targets, experience, signature, and attachment paths should stay in `profile/job-profile.md` unless a section below explicitly asks for writing preferences.
+
+## Language Preferences
+
+- Preferred email language: [English, Portuguese, match job posting language, or another explicit preference].
+- If the job posting explicitly requests another language, [follow the user's preference].
+- If the job posting is in [language] and does not request [preferred language], [fallback behavior].
+- Do not claim language ability unless that fact is present in `profile/job-profile.md`.
+
+## Tone
+
+- [tone preference]
+
+## Default Structure
+
+```text
+[preferred greeting]
+
+[application opening]
+
+[brief professional summary based only on profile/job-profile.md]
+
+[job-specific required content, if any]
+
+[preferred closing]
+
+[candidate name]
+[custom signature, if available]
+```
+
+## Portuguese Fallback Structure
+
+```text
+[Portuguese greeting]
+
+[Portuguese application opening]
+
+[resumo profissional breve baseado apenas em profile/job-profile.md]
+
+[conteúdo específico exigido pela vaga, se houver]
+
+[Portuguese closing]
+
+[nome da pessoa]
+[assinatura personalizada, se houver]
+```
+
+## Job-Specific Instructions
+
+- Always follow explicit instructions from the job text before these defaults.
+- If the job specifies exact body text, include it without contradiction.
+- If the job asks for salary expectation, availability, location, language level, or another personal fact, use only facts present in `profile/job-profile.md`.
+- If a required fact is missing, skip the job instead of inventing an answer.
+
+## Attachment Wording
+
+- Mention an attachment only when an attachment is actually sent.
+- [attachment wording preference]
+
+## Avoid
+
+- [wording or behavior to avoid]
+````
+
+Do not leave square-bracket placeholders in the proposed final content unless the user has not provided enough information for that section. If filtering or email body preferences are missing, ask focused follow-up questions before proposing the final content.
 
 ### Step A6: Present And Confirm Changes
 
-Present the proposed complete file content before writing anything:
+Present the proposed complete file contents before writing anything:
 
 ````markdown
 ## Proposed `profile/job-profile.md`
@@ -226,21 +302,28 @@ Present the proposed complete file content before writing anything:
 [complete proposed file]
 ```
 
-Apply this profile? Reply `yes` to write it, or tell me what to change.
+## Proposed `profile/email-body-rules.md`
+
+```markdown
+[complete proposed file]
+```
+
+Apply these profile files? Reply `yes` to write them, or tell me what to change.
 ````
 
 Wait for the user's response. Apply only after explicit confirmation.
 
-### Step A7: Write Confirmed Profile
+### Step A7: Write Confirmed Profile Files
 
-Write the confirmed content to `profile/job-profile.md` using targeted file editing.
+Write the confirmed content to `profile/job-profile.md` and `profile/email-body-rules.md` using targeted file editing.
 
 After writing, report:
 
-- The file updated: `profile/job-profile.md`.
+- The files updated: `profile/job-profile.md` and `profile/email-body-rules.md`.
 - Which sections changed.
 - Any documents that could not be read.
 - That filtering will use only `profile/job-profile.md`.
+- That email sending will use `profile/job-profile.md` for candidate facts and `profile/email-body-rules.md` for email body preferences.
 - Suggested next step: run `/filter-whatsapp-jobs` after `output/jobs-email.json` exists.
 
 ## Path B: Single CV Or Notes Import
@@ -250,12 +333,12 @@ Use Path B when the user pastes or mentions one CV, resume, LinkedIn export, not
 Follow this flow:
 
 1. Read the provided content thoroughly.
-2. Extract target roles, seniority, strong matches, acceptable matches, reject rules, work preferences, contract preferences, language requirements, and decision rules.
+2. Extract target roles, seniority, strong matches, acceptable matches, reject rules, work preferences, contract preferences, language requirements, decision rules, and email body preferences.
 3. Present a concise summary of what was extracted.
-4. Ask follow-up questions for missing filtering-critical information.
-5. Build the proposed complete `profile/job-profile.md` using the structure from Step A5.
-6. Present the proposed file content and wait for confirmation.
-7. Write `profile/job-profile.md` only after confirmation.
+4. Ask follow-up questions for missing filtering-critical information and email body preferences.
+5. Build the proposed complete `profile/job-profile.md` and `profile/email-body-rules.md` using the structures from Step A5.
+6. Present both proposed file contents and wait for confirmation.
+7. Write `profile/job-profile.md` and `profile/email-body-rules.md` only after confirmation.
 
 Minimum follow-up questions when missing:
 
@@ -266,12 +349,14 @@ Minimum follow-up questions when missing:
 - What remote, hybrid, on-site, location, timezone, or relocation rules matter?
 - Which contract types or schedules are acceptable?
 - Which job-posting languages are acceptable?
+- Which language should application emails prefer, and when should they match the job posting language?
+- What tone, greeting, closing, and attachment wording should application emails use?
 
 ## Path C: Interview Mode
 
 Walk through each section conversationally. Ask naturally, not as a rigid form. Let the user answer in their own words and structure the data for them.
 
-If `$ARGUMENTS` contains `--section <name>`, ask only about that section and then update only the corresponding section in `profile/job-profile.md` after confirmation.
+If `$ARGUMENTS` contains `--section <name>`, ask only about that section and then update only the corresponding section in `profile/job-profile.md` or `profile/email-body-rules.md` after confirmation.
 
 ### Section 1: Target Roles
 
@@ -330,13 +415,32 @@ Ask how strict the filter should be. Default to strict filtering:
 - Exclude any job that hits an explicit reject rule.
 - Never set `send: true` during filtering.
 
-## Step 3: Generate `profile/job-profile.md`
+### Section 10: Email Body Rules
 
-Once data collection is complete, generate the profile file only.
+Ask how `/send-job-emails` should write application email bodies.
 
-Do not create or modify unrelated files such as application templates, CV templates, scraper queries, `.claude` files, or `CLAUDE.md`. This project only needs `profile/job-profile.md` for filtering WhatsApp job postings.
+Capture:
 
-The generated file must:
+- Preferred email language.
+- Whether to match the job posting language when the job asks for a specific language.
+- Fallback behavior for Portuguese postings.
+- Tone.
+- Greeting.
+- Opening paragraph preference.
+- Closing.
+- Signature preference.
+- Attachment wording.
+- Wording or claims to avoid.
+
+Keep the generated `profile/email-body-rules.md` text in English where possible, even when it contains Portuguese fallback snippets.
+
+## Step 3: Generate Profile Files
+
+Once data collection is complete, generate the profile files only.
+
+Do not create or modify unrelated files such as CV templates, scraper queries, `.claude` files, or `CLAUDE.md`. This project uses `profile/job-profile.md` for filtering WhatsApp job postings and `profile/email-body-rules.md` for application email body preferences.
+
+The generated `profile/job-profile.md` file must:
 
 - Use Markdown.
 - Preserve the section structure from Step A5.
@@ -345,7 +449,15 @@ The generated file must:
 - Keep decision rules strict enough to avoid false positives.
 - Include `send: false` only as a filtering output rule, not as a profile attribute for jobs.
 
-Before writing, always present the complete proposed file and wait for confirmation.
+The generated `profile/email-body-rules.md` file must:
+
+- Use Markdown.
+- Keep section headings and explanatory text in English where possible.
+- Include explicit language preferences for application emails.
+- Include tone, structure, job-specific instruction handling, attachment wording, and avoid rules.
+- Avoid candidate factual claims that are not also present in `profile/job-profile.md`.
+
+Before writing, always present both complete proposed files and wait for confirmation.
 
 ## Step 4: Confirm And Next Steps
 
@@ -357,10 +469,12 @@ After writing, present a concise summary:
 Generated or updated:
 
 - `profile/job-profile.md` - normalized profile used by `/filter-whatsapp-jobs`
+- `profile/email-body-rules.md` - email body preferences used by `/send-job-emails`
 
-Filtering behavior:
+Filtering and sending behavior:
 
 - `/filter-whatsapp-jobs` reads only `profile/job-profile.md`
+- `/send-job-emails` reads `profile/job-profile.md` for candidate facts and `profile/email-body-rules.md` for email body preferences
 - `profile/documents/` is only source material for `/setup`
 - Filtered jobs will be written to `output/filtered-jobs.json` with `send: false`
 
@@ -369,25 +483,28 @@ Next steps:
 - Run `/search-whatsapp-jobs 24` to collect recent jobs
 - Run `/filter-whatsapp-jobs` to filter them against your profile
 - Run `/setup --section roles` later to update a specific section
+- Run `/setup --section email-body` later to update email writing preferences
 ```
 
 ## Common Mistakes
 
-- Do not write `profile/job-profile.md` before the user confirms the proposed content.
-- Do not filter jobs during setup.
+- Do not write `profile/job-profile.md` or `profile/email-body-rules.md` before the user confirms the proposed content.
+- Do not filter jobs or send emails during setup.
 - Do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 - Do not require subfolders inside `profile/documents/`.
 - Do not create `.claude` files, CV templates, scraper queries, `/apply`, or `/scrape` assets for this project.
 - Do not treat older resume history as stronger than explicit current preferences.
 - Do not leave broad placeholder examples when the user has provided specific information.
 - Do not make country-specific assumptions about contracts, languages, or location rules.
+- Do not duplicate candidate facts in `profile/email-body-rules.md`; keep facts in `profile/job-profile.md`.
 
 ## Design Principles
 
-- Three onboarding paths converge on one normalized file: `profile/job-profile.md`.
+- Three onboarding paths converge on two normalized files: `profile/job-profile.md` and `profile/email-body-rules.md`.
 - Path A is read-before-write and safe to re-run as documents change.
 - Path B supports one pasted or mentioned source when the user does not want to organize files.
 - Path C is conversational and can update one section at a time.
-- Documents are source material for setup only; filtering stays deterministic by reading a single profile file.
+- Documents are source material for setup only; filtering and sending stay deterministic by reading normalized profile files.
 - The user does not need to know Markdown; the agent should synthesize answers into the file structure.
-- The profile should optimize for compatible jobs, not for preserving every historical skill from a resume.
+- The job profile should optimize for compatible jobs, not for preserving every historical skill from a resume.
+- The email body rules should optimize for editable writing preferences, not for duplicating candidate facts from the job profile.

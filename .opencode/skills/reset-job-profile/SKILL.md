@@ -1,6 +1,6 @@
 ---
 name: reset-job-profile
-description: Use when the user runs /reset, asks to reset candidate profile data, clear profile/job-profile.md, delete profile/documents materials, or start fresh before /setup in this WhatsApp job search project.
+description: Use when the user runs /reset, asks to reset candidate profile data, clear profile/job-profile.md, clear profile/email-body-rules.md, delete profile/documents materials, or start fresh before /setup in this WhatsApp job search project.
 ---
 
 # Reset Job Profile
@@ -17,7 +17,7 @@ Supported reset scopes:
 
 | Scope | Effect |
 | --- | --- |
-| `profile` | Replace `profile/job-profile.md` with the blank template. |
+| `profile` | Replace `profile/job-profile.md` and `profile/email-body-rules.md` with blank templates. |
 | `documents` | Delete user-provided files and folders under `profile/documents/`, preserving `profile/documents/README.md` and the `profile/documents/` folder. |
 | `all` | Reset both profile and documents. |
 
@@ -36,7 +36,7 @@ If `$ARGUMENTS` is empty or does not contain a recognized scope keyword, ask:
 ```markdown
 ## What would you like to reset?
 
-- `profile` - Clears `profile/job-profile.md` back to the blank template. Use this to re-run `/setup` from scratch while keeping files in `profile/documents/`.
+- `profile` - Clears `profile/job-profile.md` and `profile/email-body-rules.md` back to blank templates. Use this to re-run `/setup` from scratch while keeping files in `profile/documents/`.
 - `documents` - Deletes user-provided files from `profile/documents/` only. The folder and `profile/documents/README.md` are preserved.
 - `all` - Both of the above.
 
@@ -51,7 +51,7 @@ Before doing anything destructive, show the user precisely what will be wiped.
 
 ### If Scope Includes `profile`
 
-Read `profile/job-profile.md` and report whether it has candidate data or is already blank.
+Read `profile/job-profile.md` and `profile/email-body-rules.md` and report whether each file has candidate data or is already blank.
 
 Treat the file as already blank if it contains only the standard blank template shown in Step 3. Treat it as having candidate data if it differs from that template or contains non-placeholder personal preferences.
 
@@ -61,7 +61,9 @@ Present:
 ## Profile reset will clear:
 
 - profile/job-profile.md - [has content / already blank / missing]
-  Full file will be replaced with the blank profile template.
+  Full file will be replaced with the blank job profile template.
+- profile/email-body-rules.md - [has content / already blank / missing]
+  Full file will be replaced with the blank email body rules template.
 ```
 
 ### If Scope Includes `documents`
@@ -117,7 +119,7 @@ Use this file to describe which WhatsApp job postings should be kept in `output/
 
 Replace the bracketed placeholders with your real preferences. Remove lines that do not apply.
 
-This file is the only profile source used by the filtering skill. To generate or refresh it from a CV, LinkedIn export, notes, or an interview flow, run `/setup`.
+This file is the profile source used by the filtering skill. To generate or refresh it from a CV, LinkedIn export, notes, or an interview flow, run `/setup`.
 
 ## Target Roles
 
@@ -179,6 +181,83 @@ This file is the only profile source used by the filtering skill. To generate or
 - Exclude jobs that match any explicit rejection rule.
 - The filtered output must always set `send: false` for every kept job.
 ```
+
+Replace `profile/email-body-rules.md` with exactly:
+
+````markdown
+# Email Body Rules
+
+Use this file to customize how `/send-job-emails` writes job application email bodies.
+
+Replace the bracketed placeholders with your real preferences. Remove lines that do not apply.
+
+This file controls language, tone, structure, and wording preferences. Candidate facts such as role targets, experience, signature, and attachment paths should stay in `profile/job-profile.md` unless a section below explicitly asks for writing preferences.
+
+## Language Preferences
+
+- Preferred email language: [English]
+- If the job posting explicitly requests another language, [match the requested language]
+- If the job posting is in Portuguese and does not request English, [Portuguese is acceptable]
+- Do not claim language ability unless that fact is present in `profile/job-profile.md`.
+
+## Tone
+
+- [Professional]
+- [Direct]
+- [Polite]
+
+## Default Structure
+
+```text
+[Preferred greeting]
+
+[Application opening]
+
+[Brief professional summary based only on profile/job-profile.md]
+
+[Job-specific required content, if any]
+
+[Preferred closing]
+
+[Candidate name]
+[Custom signature, if available]
+```
+
+## Portuguese Fallback Structure
+
+```text
+[Portuguese greeting]
+
+[Portuguese application opening]
+
+[Resumo profissional breve baseado apenas em profile/job-profile.md]
+
+[Conteúdo específico exigido pela vaga, se houver]
+
+[Portuguese closing]
+
+[Nome da pessoa]
+[Assinatura personalizada, se houver]
+```
+
+## Job-Specific Instructions
+
+- Always follow explicit instructions from the job text before these defaults.
+- If the job specifies exact body text, include it without contradiction.
+- If the job asks for salary expectation, availability, location, language level, or another personal fact, use only facts present in `profile/job-profile.md`.
+- If a required fact is missing, skip the job instead of inventing an answer.
+
+## Attachment Wording
+
+- Mention an attachment only when an attachment is actually sent.
+- [Attachment wording preference]
+
+## Avoid
+
+- [Personal details not present in profile/job-profile.md]
+- [Overstated experience]
+- [Salary expectation unless explicitly present in profile/job-profile.md]
+````
 
 ### Documents Reset
 

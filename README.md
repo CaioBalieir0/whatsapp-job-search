@@ -12,8 +12,10 @@ The current setup uses Docker Compose to run n8n and its supporting services. Th
 - Calls the n8n webhook `POST http://localhost:5678/webhook/buscar-vagas` with a configurable `hours` window.
 - Stores the raw search result in `output/jobs-email.json`.
 - Uses `profile/job-profile.md` as the local source of truth for job preferences.
+- Uses `profile/email-body-rules.md` as the local source of truth for application email body language, tone, and structure preferences.
 - Filters compatible jobs into `output/filtered-jobs.json`.
 - Marks every filtered job with `send: false` so a later step can decide what to send or apply to.
+- Sends professional application emails for filtered jobs through the local email MCP and marks successful sends with `send: true`.
 
 ## Data Flow
 
@@ -25,6 +27,8 @@ WhatsApp messages
   -> output/jobs-email.json in this repository
   -> profile-based filtering
   -> output/filtered-jobs.json
+  -> email application sending through MCP
+  -> output/filtered-jobs.json updated with send: true for successful sends
 ```
 
 ## Services
@@ -56,6 +60,8 @@ The n8n container mounts `./output` to `/data/output`, so files written by n8n u
 |       +-- search-whatsapp-jobs/
 |       |   +-- SKILL.md
 |       +-- filter-whatsapp-jobs/
+|       |   +-- SKILL.md
+|       +-- send-job-emails/
 |           +-- SKILL.md
 +-- output/
 |   +-- jobs-email.json
@@ -63,6 +69,7 @@ The n8n container mounts `./output` to `/data/output`, so files written by n8n u
 +-- profile/
     +-- README.md
     +-- job-profile.md
+    +-- email-body-rules.md
     +-- documents/
         +-- README.md
 ```
@@ -75,9 +82,11 @@ The n8n container mounts `./output` to `/data/output`, so files written by n8n u
 | `.opencode/skills/reset-job-profile/SKILL.md` | Agent workflow for resetting local profile data before running setup again. |
 | `.opencode/skills/search-whatsapp-jobs/SKILL.md` | Agent workflow for running the n8n job-search webhook and validating raw output. |
 | `.opencode/skills/filter-whatsapp-jobs/SKILL.md` | Agent workflow for filtering raw jobs against the local profile. |
+| `.opencode/skills/send-job-emails/SKILL.md` | Agent workflow for sending professional application emails for filtered jobs through the email MCP. |
 | `output/jobs-email.json` | Raw job-search result written by the n8n workflow. |
-| `output/filtered-jobs.json` | Filtered job list generated from the local profile. |
+| `output/filtered-jobs.json` | Filtered job list generated from the local profile. Tracks `send: false` for pending jobs and `send: true` after successful email sends. |
 | `profile/job-profile.md` | Normalized profile with target roles, skills, preferences, and rejection rules. |
+| `profile/email-body-rules.md` | User-editable rules for application email body language, tone, structure, and wording preferences. |
 | `profile/README.md` | Instructions for generating and editing the job profile. |
 | `profile/documents/` | Optional free-form source materials for `/setup`; not used by filtering. |
 
@@ -137,6 +146,7 @@ Filtering rules:
 - Every kept job preserves `sender`, `text`, and `timestamp`.
 - Every kept job gets `send: false`.
 - `send` must never be set to `true` by the filter step.
+- `/send-job-emails` may later update successfully sent jobs to `send: true`.
 - Jobs must not include a `reason` field.
 - `output/jobs-email.json` must not be modified by the filter step.
 
@@ -153,6 +163,8 @@ Edit this file to describe the roles, seniority levels, technologies, work modes
 Placeholders use square brackets, for example `[Backend Developer]`. Replace them with your real preferences before relying on filtering results.
 
 You can generate or refresh this file with `/setup`. If you have source materials, place them under `profile/documents/` before running setup, or paste your CV, notes, and professional context directly into the setup conversation. Filtering reads only `profile/job-profile.md`, not the documents folder.
+
+For `/send-job-emails`, include explicit candidate facts in `profile/job-profile.md`, such as candidate name, professional summary, signature, and attachment paths. Customize email body language, tone, structure, and wording in `profile/email-body-rules.md`. The email-sending skill reads these two profile files; it does not read `profile/documents/`.
 
 See `profile/README.md` for profile editing guidance.
 
@@ -202,6 +214,8 @@ Install MCP dependencies:
 npm install --prefix mcp
 ```
 
+Use `/send-job-emails confirm` to preview generated application emails before sending. Use `/send-job-emails auto` to send eligible filtered jobs automatically after validation. Both modes use `profile/job-profile.md` for candidate facts, `profile/email-body-rules.md` for email body preferences, the email MCP for sending, and update `output/filtered-jobs.json` to `send: true` only after successful sends.
+
 After changing `.opencode/opencode.json` or SMTP environment variables, quit and restart OpenCode so the MCP config is loaded.
 
 ## Agent Skills
@@ -210,12 +224,13 @@ The repository includes project-level opencode skills under `.opencode/skills/`.
 
 | Skill | Purpose |
 | --- | --- |
-| `setup-job-profile` | Runs `/setup` onboarding and generates or refreshes `profile/job-profile.md` from documents, pasted context, or interview mode. |
+| `setup-job-profile` | Runs `/setup` onboarding and generates or refreshes `profile/job-profile.md` and `profile/email-body-rules.md` from documents, pasted context, or interview mode. |
 | `reset-job-profile` | Runs `/reset` and clears `profile/job-profile.md`, `profile/documents/`, or both after explicit confirmation. |
 | `search-whatsapp-jobs` | Runs the n8n webhook, validates `output/jobs-email.json`, and reports the search result summary. |
 | `filter-whatsapp-jobs` | Reads `profile/job-profile.md` and `output/jobs-email.json`, keeps compatible jobs, and writes `output/filtered-jobs.json`. |
+| `send-job-emails` | Reads `profile/job-profile.md`, `profile/email-body-rules.md`, and `output/filtered-jobs.json`, sends professional application emails through the email MCP, and marks successful sends with `send: true`. |
 
-These skills define the expected agent behavior and guardrails. They prevent the agent from bypassing the webhook flow, querying internal databases directly, calling WhatsApp directly, or inventing output schemas.
+These skills define the expected agent behavior and guardrails. They prevent the agent from bypassing the webhook flow, querying internal databases directly, calling WhatsApp directly, inventing output schemas, reading profile documents during filtering or sending, or marking failed sends as sent.
 
 ## Agent Commands
 
@@ -223,11 +238,12 @@ The repository registers opencode commands in `.opencode/opencode.json`.
 
 | Command | Usage | Purpose |
 | --- | --- | --- |
-| `/setup` | `/setup` or `/setup --section roles` | Generates or refreshes `profile/job-profile.md` from `profile/documents/`, a pasted CV, or interview mode. |
+| `/setup` | `/setup`, `/setup --section roles`, or `/setup --section email-body` | Generates or refreshes `profile/job-profile.md` and `profile/email-body-rules.md` from `profile/documents/`, a pasted CV, or interview mode. |
 | `/reset` | `/reset profile`, `/reset documents`, or `/reset all` | Resets local profile data after exact `RESET` confirmation. |
 | `/search-whatsapp-jobs` | `/search-whatsapp-jobs 24` | Searches WhatsApp jobs through the n8n webhook for the provided number of hours. If no hours are provided, the agent asks which time window to use. |
 | `/filter-whatsapp-jobs` | `/filter-whatsapp-jobs` | Filters `output/jobs-email.json` against `profile/job-profile.md` and writes `output/filtered-jobs.json`. |
 | `/job-search-pipeline` | `/job-search-pipeline 24` | Runs the full flow: search through the webhook, validate raw output, filter against the profile, and validate filtered output. |
+| `/send-job-emails` | `/send-job-emails confirm` or `/send-job-emails auto` | Sends professional application emails for filtered jobs through the email MCP. `confirm` previews the batch first; `auto` sends after validation. |
 
 After changing `.opencode/opencode.json` or any skill file, quit and restart opencode. Configuration and skills are loaded at startup and are not hot-reloaded in the current session.
 
@@ -235,4 +251,4 @@ After changing `.opencode/opencode.json` or any skill file, quit and restart ope
 
 - The n8n workflow itself is expected to exist in the local n8n instance; this repository currently documents and supports the workflow contract rather than exporting the full workflow definition.
 - `output/filtered-jobs.json` is generated by the agent filtering step, not directly by the n8n webhook.
-- The `send: false` field is only a marker for future sending or application workflows. This repository does not currently send applications automatically.
+- Email sending depends on the local email MCP being configured with valid SMTP environment variables and OpenCode being restarted after configuration changes.
