@@ -1,0 +1,16 @@
+{
+  "name": "email-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node email-server.mjs",
+    "test": "node --test email-server.test.mjs",
+    "check": "node --check email-server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "nodemailer": "latest",
+    "zod": "latest"
+  }
+}

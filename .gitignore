@@ -1,3 +1,5 @@
 output/
 profile/documents/*
 !profile/documents/README.md
+mcp/.env
+node_modules

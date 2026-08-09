@@ -184,6 +184,26 @@ Validate the raw output:
 node -e 'const fs=require("fs"); const p="output/jobs-email.json"; const j=JSON.parse(fs.readFileSync(p,"utf8")); if (typeof j.lastRun !== "string" || typeof j.hoursConsulted !== "number" || typeof j.total !== "number" || !Array.isArray(j.jobs)) process.exit(1); if (j.jobs.some((job)=>typeof job.sender !== "string" || typeof job.text !== "string" || typeof job.timestamp !== "number")) process.exit(1); console.log(JSON.stringify({ lastRun: j.lastRun, hoursConsulted: j.hoursConsulted, total: j.total }, null, 2));'
 ```
 
+## Email MCP
+
+This repository includes a local OpenCode MCP server under `mcp/` with one tool, `send_email`. It sends plain text email through SMTP and is configured for Gmail SMTP by environment variables.
+
+Required environment variables:
+
+- `SMTP_HOST=smtp.gmail.com`
+- `SMTP_PORT=587`
+- `SMTP_USER`: Gmail account address
+- `SMTP_PASS`: Google app password, not the normal Google password
+- `SMTP_FROM`: sender address, normally the same as `SMTP_USER`
+
+Install MCP dependencies:
+
+```bash
+npm install --prefix mcp
+```
+
+After changing `.opencode/opencode.json` or SMTP environment variables, quit and restart OpenCode so the MCP config is loaded.
+
 ## Agent Skills
 
 The repository includes project-level opencode skills under `.opencode/skills/`.

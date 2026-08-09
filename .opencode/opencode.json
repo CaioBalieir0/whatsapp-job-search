@@ -21,5 +21,19 @@
       "description": "Search WhatsApp jobs and then filter them against the local profile",
       "template": "Run the full WhatsApp job search pipeline in this n8n project. First use the search-whatsapp-jobs skill with $ARGUMENTS as the optional hours value. If $ARGUMENTS is empty, follow the skill's interactive hours flow. After output/jobs-email.json is valid, use the filter-whatsapp-jobs skill to read profile/job-profile.md and create output/filtered-jobs.json. Do not read profile/documents/ during filtering. Validate both outputs and report lastRun, hoursConsulted, sourceTotal, total, and the output paths."
     }
+  },
+  "mcp": {
+    "email": {
+      "type": "local",
+      "command": ["npm", "--prefix", "mcp", "start"],
+      "enabled": true,
+      "env": {
+        "SMTP_HOST": "${SMTP_HOST}",
+        "SMTP_PORT": "${SMTP_PORT}",
+        "SMTP_USER": "${SMTP_USER}",
+        "SMTP_PASS": "${SMTP_PASS}",
+        "SMTP_FROM": "${SMTP_FROM}"
+      }
+    }
   }
 }
