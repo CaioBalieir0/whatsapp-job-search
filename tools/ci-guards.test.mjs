@@ -45,15 +45,14 @@ test('lintSkills rejects missing titles and unknown command skill references', (
   });
 
   assert.deepEqual(result.errors, [
-    '.opencode/skills/search-whatsapp-jobs/SKILL.md must contain a markdown title',
-    '.opencode/opencode.json command "broken" references missing skill "missing-skill"',
+    '.claude/skills/search-whatsapp-jobs/SKILL.md must contain a markdown title',
+    'opencode.json command "broken" references missing skill "missing-skill"',
   ]);
 });
 
 test('runSecurityGuards accepts protected personal data rules and safe manifests', () => {
   const result = runSecurityGuards({
-    rootGitignore: '.env\noutput/*.json\n!profile/documents/README.md\nmcp/scheduled-emails.json\nnode_modules\n',
-    opencodeGitignore: 'node_modules\npackage.json\npackage-lock.json\nbun.lock\n.gitignore\n',
+    rootGitignore: '.env\noutput/*.json\n!profile/documents/README.md\nmcp/scheduled-emails.json\nnode_modules\n.opencode/\n',
     packageJson: { scripts: { check: 'node --check index.mjs', test: 'node --test' } },
     mcpPackageJson: { scripts: { start: 'node email-server.mjs', test: 'node --test' } },
     opencodeConfig: {
@@ -61,7 +60,7 @@ test('runSecurityGuards accepts protected personal data rules and safe manifests
         email: {
           type: 'local',
           command: ['npm', '--prefix', 'mcp', 'start'],
-          env: { SMTP_PASS: '${SMTP_PASS}' },
+          environment: { SMTP_PASS: '${SMTP_PASS}' },
         },
       },
     },
@@ -73,7 +72,6 @@ test('runSecurityGuards accepts protected personal data rules and safe manifests
 test('runSecurityGuards rejects weakened ignores, lifecycle scripts, and unsafe MCP commands', () => {
   const result = runSecurityGuards({
     rootGitignore: 'node_modules\n',
-    opencodeGitignore: 'node_modules\n',
     packageJson: { scripts: { postinstall: 'node install.js' } },
     mcpPackageJson: { scripts: { preinstall: 'node preinstall.js' } },
     opencodeConfig: {
@@ -81,7 +79,7 @@ test('runSecurityGuards rejects weakened ignores, lifecycle scripts, and unsafe 
         email: {
           type: 'local',
           command: ['sh', '-c', 'npm --prefix mcp start'],
-          env: { SMTP_PASS: 'secret' },
+          environment: { SMTP_PASS: 'secret' },
         },
       },
     },
@@ -92,11 +90,10 @@ test('runSecurityGuards rejects weakened ignores, lifecycle scripts, and unsafe 
     '.gitignore must ignore output/*.json',
     '.gitignore must keep profile/documents/README.md trackable',
     '.gitignore must ignore mcp/scheduled-emails.json',
-    '.opencode/.gitignore must ignore package.json',
-    '.opencode/.gitignore must ignore package-lock.json',
+    '.gitignore must ignore .opencode/',
     'package.json must not define lifecycle script "postinstall"',
     'mcp/package.json must not define lifecycle script "preinstall"',
-    '.opencode/opencode.json mcp.email command must be ["npm","--prefix","mcp","start"]',
-    '.opencode/opencode.json mcp.email env SMTP_PASS must reference an environment variable placeholder',
+    'opencode.json mcp.email command must be ["npm","--prefix","mcp","start"]',
+    'opencode.json mcp.email environment SMTP_PASS must reference an environment variable placeholder',
   ]);
 });

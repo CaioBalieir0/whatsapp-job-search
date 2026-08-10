@@ -7,11 +7,11 @@ export function lintSkills({ skills, opencodeConfig }) {
 
   for (const [skillName, content] of skills) {
     if (!hasMarkdownTitle(content)) {
-      errors.push(`.opencode/skills/${skillName}/SKILL.md must contain a markdown title`);
+      errors.push(`.claude/skills/${skillName}/SKILL.md must contain a markdown title`);
     }
 
     if (content.startsWith('---\n') && !/^description:\s*\S/m.test(content)) {
-      errors.push(`.opencode/skills/${skillName}/SKILL.md frontmatter must include description`);
+      errors.push(`.claude/skills/${skillName}/SKILL.md frontmatter must include description`);
     }
   }
 
@@ -22,7 +22,7 @@ export function lintSkills({ skills, opencodeConfig }) {
     for (const match of matches) {
       const skillName = match[1];
       if (!skills.has(skillName)) {
-        errors.push(`.opencode/opencode.json command "${commandName}" references missing skill "${skillName}"`);
+        errors.push(`opencode.json command "${commandName}" references missing skill "${skillName}"`);
       }
     }
   }
@@ -35,7 +35,7 @@ function hasMarkdownTitle(content) {
 }
 
 function loadRepositoryInputs(rootDir) {
-  const skillsDir = join(rootDir, '.opencode', 'skills');
+  const skillsDir = join(rootDir, '.claude', 'skills');
   const skills = new Map();
 
   for (const dirent of readdirSync(skillsDir, { withFileTypes: true })) {
@@ -46,7 +46,7 @@ function loadRepositoryInputs(rootDir) {
 
   return {
     skills,
-    opencodeConfig: JSON.parse(readFileSync(join(rootDir, '.opencode', 'opencode.json'), 'utf8')),
+    opencodeConfig: JSON.parse(readFileSync(join(rootDir, 'opencode.json'), 'utf8')),
   };
 }
 

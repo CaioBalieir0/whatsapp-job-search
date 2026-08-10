@@ -1,6 +1,8 @@
 .env
-output/
-profile/documents/*
+output/*.json
+profile/documents/**
+!profile/documents/
 !profile/documents/README.md
-mcp/.env
+mcp/scheduled-emails.json
 node_modules
+.opencode/

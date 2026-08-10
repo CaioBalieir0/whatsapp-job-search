@@ -40,7 +40,46 @@ services:
       - postgres
       - redis
 
+  email-mcp:
+    profiles:
+      - mcp
+    build:
+      context: ./mcp
+    restart: unless-stopped
+    ports:
+      - "${MCP_HTTP_BIND:-127.0.0.1}:${MCP_HTTP_PORT:-3333}:3333"
+    environment:
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
+      - MCP_HTTP_HOST=0.0.0.0
+      - MCP_HTTP_PORT=3333
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - EMAIL_QUEUE_FILE=/mcp/data/scheduled-emails.json
+    volumes:
+      - email_mcp_data:/mcp/data
+
+  email-worker:
+    profiles:
+      - mcp
+    build:
+      context: ./mcp
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    environment:
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - EMAIL_QUEUE_FILE=/mcp/data/scheduled-emails.json
+    volumes:
+      - email_mcp_data:/mcp/data
+
 volumes:
   postgres_data:
   evolution_instances:
   redis_data:
+  email_mcp_data:

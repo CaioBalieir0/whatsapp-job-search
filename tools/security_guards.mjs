@@ -15,7 +15,6 @@ const LIFECYCLE_SCRIPTS = new Set([
 
 export function runSecurityGuards({
   rootGitignore,
-  opencodeGitignore,
   packageJson,
   mcpPackageJson,
   opencodeConfig,
@@ -38,14 +37,12 @@ export function runSecurityGuards({
     'mcp/scheduled-emails.json',
     'must ignore mcp/scheduled-emails.json',
   );
-
-  requireGitignoreLine(errors, '.opencode/.gitignore', opencodeGitignore, 'package.json', 'must ignore package.json');
   requireGitignoreLine(
     errors,
-    '.opencode/.gitignore',
-    opencodeGitignore,
-    'package-lock.json',
-    'must ignore package-lock.json',
+    '.gitignore',
+    rootGitignore,
+    '.opencode/',
+    'must ignore .opencode/',
   );
 
   rejectLifecycleScripts(errors, 'package.json', packageJson);
@@ -54,12 +51,12 @@ export function runSecurityGuards({
   const emailMcp = opencodeConfig.mcp?.email;
   const expectedCommand = ['npm', '--prefix', 'mcp', 'start'];
   if (JSON.stringify(emailMcp?.command) !== JSON.stringify(expectedCommand)) {
-    errors.push('.opencode/opencode.json mcp.email command must be ["npm","--prefix","mcp","start"]');
+    errors.push('opencode.json mcp.email command must be ["npm","--prefix","mcp","start"]');
   }
 
-  for (const [name, value] of Object.entries(emailMcp?.env ?? {})) {
+  for (const [name, value] of Object.entries(emailMcp?.environment ?? {})) {
     if (!/^\$\{[A-Z0-9_]+\}$/.test(String(value))) {
-      errors.push(`.opencode/opencode.json mcp.email env ${name} must reference an environment variable placeholder`);
+      errors.push(`opencode.json mcp.email environment ${name} must reference an environment variable placeholder`);
     }
   }
 
@@ -84,10 +81,9 @@ function rejectLifecycleScripts(errors, fileName, manifest) {
 function loadRepositoryInputs(rootDir) {
   return {
     rootGitignore: readFileSync(join(rootDir, '.gitignore'), 'utf8'),
-    opencodeGitignore: readFileSync(join(rootDir, '.opencode', '.gitignore'), 'utf8'),
     packageJson: JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8')),
     mcpPackageJson: JSON.parse(readFileSync(join(rootDir, 'mcp', 'package.json'), 'utf8')),
-    opencodeConfig: JSON.parse(readFileSync(join(rootDir, '.opencode', 'opencode.json'), 'utf8')),
+    opencodeConfig: JSON.parse(readFileSync(join(rootDir, 'opencode.json'), 'utf8')),
   };
 }
 

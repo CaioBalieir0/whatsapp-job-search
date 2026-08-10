@@ -1,8 +1,10 @@
 # WhatsApp Job Search
 
+[![CI](https://github.com/CaioBalieir0/whatsapp-job-search-n8n/actions/workflows/ci.yml/badge.svg)](https://github.com/CaioBalieir0/whatsapp-job-search-n8n/actions/workflows/ci.yml)
+
 *A local job-search assistant that turns WhatsApp job posts into filtered opportunities and ready-to-send application emails.*
 
-WhatsApp Job Search is a local automation workspace built around a small Node.js search CLI, Evolution API, agent commands, and a local email MCP server. It searches recent job postings received through WhatsApp, stores them as structured JSON, filters them against your local candidate profile, and helps send professional application emails through SMTP.
+WhatsApp Job Search is a local automation workspace built around a small Node.js search CLI, Evolution API, Claude Code commands and skills, and a local email MCP server. It searches recent job postings received through WhatsApp, stores them as structured JSON, filters them against your local candidate profile, and helps send professional application emails through SMTP.
 
 The whole workflow runs on your machine. Your profile, raw job messages, filtered results, and email preferences stay in local files.
 
@@ -10,7 +12,7 @@ The whole workflow runs on your machine. Your profile, raw job messages, filtere
 
 This project is not a public job board scraper. It is a personal workflow for job opportunities that already arrive in your WhatsApp channels or groups.
 
-The local stack provides WhatsApp access through Evolution API, while repository code and agent commands handle the job-search workflow:
+The local stack provides WhatsApp access through Evolution API, while repository code and Claude commands handle the job-search workflow:
 
 - Generate or refresh your job-search profile.
 - Search recent WhatsApp job posts through the local Node.js CLI.
@@ -31,7 +33,7 @@ WhatsApp job messages
 ## Prerequisites
 
 - [Docker](https://www.docker.com/) with Docker Compose.
-- An agent CLI or MCP-capable coding assistant that can use the included project commands and skills.
+- Claude Code or a compatible MCP-capable coding assistant that can use the included project commands and skills.
 - Node.js and npm for the local search CLI and email MCP server.
 - A configured Evolution API instance connected to WhatsApp.
 - Optional email sending: SMTP credentials, for example a Gmail address plus a Google app password.
@@ -51,7 +53,7 @@ Recommended: use a private fork or private repository if you plan to store CVs, 
 
 ### 2. Configure environment variables
 
-Copy the root environment reference and fill in your local values:
+Copy the single environment reference and fill in your local values:
 
 ```bash
 cp .env.example .env
@@ -67,7 +69,21 @@ Required search variables:
 | `WHATSAPP_GROUP_JID` | WhatsApp group JID to search. |
 | `JOBS_OUTPUT_FILE` | Output path for raw search results. Defaults to `output/jobs-email.json`. |
 
-The same `.env` file also provides Docker Compose defaults for Postgres and timezone settings.
+The same root `.env` file also provides Docker Compose defaults for Postgres, timezone, SMTP, and MCP settings. There is no separate `mcp/.env`; keep all runtime variables in the root `.env`.
+
+Optional email MCP variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `SMTP_HOST` | SMTP host, for example `smtp.gmail.com`. |
+| `SMTP_PORT` | SMTP port, usually `587` or `465`. |
+| `SMTP_USER` | SMTP username. |
+| `SMTP_PASS` | SMTP password or app password. |
+| `SMTP_FROM` | Sender address for outgoing emails. |
+| `EMAIL_QUEUE_FILE` | Scheduled email queue path inside the MCP container. Defaults to `/mcp/data/scheduled-emails.json` in Docker. |
+| `MCP_AUTH_TOKEN` | Required bearer token for HTTP MCP access. Use a long random value. |
+| `MCP_HTTP_BIND` | Host address used by Docker port publishing. Defaults to `127.0.0.1`. |
+| `MCP_HTTP_PORT` | Published MCP HTTP port. Defaults to `3333`. |
 
 ### 3. Start the local WhatsApp stack
 
@@ -75,13 +91,19 @@ The same `.env` file also provides Docker Compose defaults for Postgres and time
 docker compose up -d
 ```
 
-The stack starts:
+The default stack starts:
 
 | Service | Purpose | Local Port |
 | --- | --- | --- |
 | `postgres` | Persistence for Evolution API. | `5433` by default |
 | `redis` | Cache for Evolution API. | Not exposed |
 | `evolution-api` | WhatsApp integration service. | `8080` |
+The email MCP services are also defined in `docker-compose.yml`, but they are behind the `mcp` Compose profile, so they only start when requested:
+
+| Service | Purpose | Local Port |
+| --- | --- | --- |
+| `email-mcp` | HTTP email MCP server. | `3333`, bound to `127.0.0.1` by default |
+| `email-worker` | Scheduled email queue worker. | Not exposed |
 
 Check the running services with:
 
@@ -91,7 +113,7 @@ docker compose ps
 
 ### 4. Create your job profile
 
-Start your agent CLI in this repository and run:
+Start Claude Code or your compatible agent CLI in this repository and run:
 
 ```text
 /setup
@@ -102,7 +124,7 @@ Start your agent CLI in this repository and run:
 - `profile/job-profile.md`: your target roles, skills, preferences, and rejection rules.
 - `profile/email-body-rules.md`: your preferred language, tone, structure, and wording for application emails.
 
-You can place CVs, resume PDFs, LinkedIn exports, notes, or other source material in `profile/documents/` before running setup. You can also paste professional context directly into the setup conversation.
+You can place CVs, resume PDFs, LinkedIn exports, notes, or other source material in `profile/documents/` before running setup. You can also paste professional context directly into the setup conversation. During setup, attachment paths are optional and may point to files in `profile/documents/` or any other local path you provide.
 
 See [`profile/README.md`](profile/README.md) and [`profile/documents/README.md`](profile/documents/README.md) for the profile workflow.
 
@@ -170,6 +192,52 @@ Successful sends are marked with `send: true` in `output/filtered-jobs.json`. Fa
 
 See [`mcp/README.md`](mcp/README.md) for SMTP setup, attachments, scheduled emails, and worker usage.
 
+You can also run the MCP through Docker after setting `SMTP_*` and `MCP_AUTH_TOKEN` in `.env`:
+
+```bash
+docker compose --profile mcp up -d email-mcp email-worker
+```
+
+Check the HTTP MCP health endpoint:
+
+```bash
+curl http://127.0.0.1:3333/health
+```
+
+Remote MCP clients must connect to the Streamable HTTP endpoint with the bearer token:
+
+```bash
+curl -X POST http://127.0.0.1:3333/mcp \
+  -H "Authorization: Bearer $MCP_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+## VPS MCP Compose
+
+Use the main `docker-compose.yml` on a VPS and start only the MCP services:
+
+```bash
+docker compose --profile mcp up -d email-mcp email-worker
+```
+
+That does not start Postgres, Redis, or Evolution API because the command names only `email-mcp` and `email-worker`.
+
+The Compose file publishes the MCP port on `127.0.0.1` by default. To expose it publicly, set `MCP_HTTP_BIND=0.0.0.0` intentionally and use a strong `MCP_AUTH_TOKEN`.
+
+Public exposure is sensitive. Prefer firewall allowlists and TLS/reverse proxy even though the HTTP endpoint requires a bearer token.
+
+## CI
+
+GitHub Actions runs on every push and pull request through `.github/workflows/ci.yml`.
+
+The CI workflow runs:
+
+- `npm run check`
+- `npm test`
+- `npm --prefix mcp run check`
+- `npm --prefix mcp test`
+
 ## CLI Commands
 
 Run the search directly without an agent command:
@@ -190,9 +258,9 @@ Check JavaScript syntax:
 npm run check
 ```
 
-## Agent Commands
+## Claude Commands
 
-The project includes these local agent commands:
+The project includes these local Claude commands:
 
 | Command | Example | Purpose |
 | --- | --- | --- |
@@ -208,15 +276,24 @@ The project includes these local agent commands:
 ```text
 .
 |-- .env.example                   # Root Evolution API and search CLI environment reference
+|-- .claude/
+|   |-- commands/                  # Claude slash commands for the workflow
+|   `-- skills/                    # Claude skills used by the commands
+|-- .github/
+|   `-- workflows/
+|       `-- ci.yml                 # Push and pull request checks
 |-- docker-compose.yml             # Local Postgres, Redis, and Evolution API stack
 |-- package.json                   # Root search CLI scripts and tests
+|-- opencode.json                  # OpenCode compatibility config pointing at .claude/skills
 |-- README.md                      # Project overview and quick start
 |-- scripts/
 |   |-- search-whatsapp-jobs.mjs   # Local WhatsApp search CLI
 |   `-- search-whatsapp-jobs.test.mjs
 |-- mcp/
+|   |-- Dockerfile                 # Email MCP container image
 |   |-- README.md                  # Local email MCP documentation
 |   |-- email-server.mjs           # MCP server exposing send_email
+|   |-- http-server.mjs            # Authenticated HTTP email MCP server
 |   |-- email-worker.mjs           # Scheduled email queue worker
 |   `-- package.json               # MCP scripts and dependencies
 |-- output/

@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node email-server.mjs",
+    "start:http": "node http-server.mjs",
+    "worker": "node email-worker.mjs",
     "test": "node --test email-server.test.mjs",
-    "check": "node --check email-server.mjs"
+    "check": "node --check email-server.mjs && node --check email-worker.mjs && node --check http-server.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "latest",

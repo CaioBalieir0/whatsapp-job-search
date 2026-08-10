@@ -16,6 +16,7 @@ This skill is for profile setup only. Do not filter jobs, do not send emails, do
 - Source materials are optional and live under `profile/documents/`.
 - `profile/documents/` is free-form; do not require subfolders or a naming convention.
 - The user may also paste a CV, resume, notes, LinkedIn text, or professional context directly into the conversation.
+- Attachment paths are optional. Ask the user whether to configure CV, resume, portfolio, or other attachment paths; paths may be under `profile/documents/` or any local path the user provides.
 - The generated filtering profile is `profile/job-profile.md`.
 - The generated email body preferences file is `profile/email-body-rules.md`.
 - `/filter-whatsapp-jobs` reads only `profile/job-profile.md`; it must not read `profile/documents/`.
@@ -36,6 +37,7 @@ Accepted section names:
 - `work`
 - `contract`
 - `languages`
+- `attachments`
 - `rules`
 - `email`
 - `email-body`
@@ -124,6 +126,7 @@ Extract facts and preferences that help build the profile:
 - Contract, employment, freelance, schedule, or availability preferences.
 - Language requirements and accepted job-posting languages.
 - Email body language preferences, preferred email language, fallback language behavior, tone, greeting, closing, signature preferences, and attachment wording preferences.
+- Optional attachment paths for CVs, resumes, portfolios, or other application files, plus when each attachment should be used.
 - Decision rules for weak, ambiguous, or borderline jobs.
 
 For CVs and resumes, extract work history, education, skills, tools, domains, seniority signals, leadership signals, and role direction. Do not copy personal contact details into `profile/job-profile.md` unless they affect job filtering.
@@ -209,6 +212,13 @@ This file is the profile source used by the filtering skill. To generate or refr
 ## Language Requirements
 
 - [language rule]
+
+## Attachments
+
+- [CV or resume path, for example `profile/documents/cv.pdf` or `/absolute/path/to/cv.pdf`]
+- [Portfolio or other attachment path, if applicable]
+- [When to attach each file, if multiple attachments are configured]
+- Do not attach files unless the job asks for a CV/resume attachment or the user explicitly requests attachments.
 
 ## Decision Rules
 
@@ -349,6 +359,7 @@ Minimum follow-up questions when missing:
 - What remote, hybrid, on-site, location, timezone, or relocation rules matter?
 - Which contract types or schedules are acceptable?
 - Which job-posting languages are acceptable?
+- Which CV, resume, portfolio, or other attachment paths should be used for applications, if any? Paths may be under `profile/documents/` or any local path.
 - Which language should application emails prefer, and when should they match the job posting language?
 - What tone, greeting, closing, and attachment wording should application emails use?
 
@@ -406,7 +417,15 @@ Ask which job-posting languages are acceptable, required, optional, or disqualif
 
 Capture whether the user accepts English, local language postings, bilingual roles, or roles requiring languages they do not speak.
 
-### Section 9: Decision Rules
+### Section 9: Attachments
+
+Ask whether the user wants `/send-job-emails` to attach CVs, resumes, portfolios, or other files when a job asks for attachments.
+
+Capture each configured attachment path exactly as provided. Accept relative paths such as `profile/documents/cv.pdf` and absolute paths outside the repository. For each path, capture when it should be used, especially when the user has multiple role-specific CVs.
+
+If the user does not want to configure attachments, include an explicit rule that no attachments are configured and jobs requiring attachments should be skipped unless the user later adds paths.
+
+### Section 10: Decision Rules
 
 Ask how strict the filter should be. Default to strict filtering:
 
@@ -415,7 +434,7 @@ Ask how strict the filter should be. Default to strict filtering:
 - Exclude any job that hits an explicit reject rule.
 - Never set `send: true` during filtering.
 
-### Section 10: Email Body Rules
+### Section 11: Email Body Rules
 
 Ask how `/send-job-emails` should write application email bodies.
 
@@ -438,12 +457,13 @@ Keep the generated `profile/email-body-rules.md` text in English where possible,
 
 Once data collection is complete, generate the profile files only.
 
-Do not create or modify unrelated files such as CV templates, scraper queries, `.claude` files, or `CLAUDE.md`. This project uses `profile/job-profile.md` for filtering WhatsApp job postings and `profile/email-body-rules.md` for application email body preferences.
+Do not create or modify unrelated files such as CV templates, scraper queries, or `CLAUDE.md`. This project uses `profile/job-profile.md` for filtering WhatsApp job postings and `profile/email-body-rules.md` for application email body preferences.
 
 The generated `profile/job-profile.md` file must:
 
 - Use Markdown.
 - Preserve the section structure from Step A5.
+- Include an `Attachments` section with configured paths, or explicit placeholders when the user has not provided attachment paths.
 - Use clear user-specific values instead of generic placeholders whenever possible.
 - Avoid local or country-specific assumptions unless provided by the user.
 - Keep decision rules strict enough to avoid false positives.
@@ -492,7 +512,7 @@ Next steps:
 - Do not filter jobs or send emails during setup.
 - Do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 - Do not require subfolders inside `profile/documents/`.
-- Do not create `.claude` files, CV templates, scraper queries, `/apply`, or `/scrape` assets for this project.
+- Do not create CV templates, scraper queries, `/apply`, or `/scrape` assets for this project.
 - Do not treat older resume history as stronger than explicit current preferences.
 - Do not leave broad placeholder examples when the user has provided specific information.
 - Do not make country-specific assumptions about contracts, languages, or location rules.

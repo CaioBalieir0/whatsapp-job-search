@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
-import { pathToFileURL } from "node:url"
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
+import path from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
@@ -16,6 +19,12 @@ const emailInputSchema = {
 }
 
 const requiredEnv = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"]
+const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
+
+export const DEFAULT_QUEUE_FILE = process.env.EMAIL_QUEUE_FILE ?? path.join(moduleDirectory, "scheduled-emails.json")
+const MAX_SCHEDULED_EMAIL_ID = 100
+const LOCK_RETRY_MS = 50
+const LOCK_TIMEOUT_MS = 5000
 
 export function createSmtpConfig(env = process.env) {
   const missing = requiredEnv.filter((name) => !env[name])
@@ -60,7 +69,147 @@ export function buildMailOptions(input, from) {
   }
 }
 
+export async function readScheduledEmails(queueFile = DEFAULT_QUEUE_FILE) {
+  try {
+    const contents = await readFile(queueFile, "utf8")
+
+    if (contents.trim() === "") {
+      return []
+    }
+
+    const jobs = JSON.parse(contents)
+
+    if (!Array.isArray(jobs)) {
+      throw new Error("scheduled email queue must be a JSON array")
+    }
+
+    return jobs
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return []
+    }
+
+    throw error
+  }
+}
+
+export async function writeScheduledEmails(jobs, queueFile = DEFAULT_QUEUE_FILE) {
+  await mkdir(path.dirname(queueFile), { recursive: true })
+
+  const temporaryFile = `${queueFile}.${process.pid}.${Date.now()}.tmp`
+  await writeFile(temporaryFile, `${JSON.stringify(jobs, null, 2)}\n`)
+  await rename(temporaryFile, queueFile)
+}
+
+export async function updateScheduledEmails(queueFile, update) {
+  const lockDirectory = `${queueFile}.lock`
+  const startedAt = Date.now()
+  let locked = false
+
+  while (!locked) {
+    try {
+      await mkdir(lockDirectory, { recursive: false })
+      locked = true
+    } catch (error) {
+      if (!error || error.code !== "EEXIST") {
+        throw error
+      }
+
+      if (Date.now() - startedAt > LOCK_TIMEOUT_MS) {
+        throw new Error(`Timed out waiting for scheduled email queue lock: ${lockDirectory}`)
+      }
+
+      await delay(LOCK_RETRY_MS)
+    }
+  }
+
+  try {
+    const jobs = await readScheduledEmails(queueFile)
+    const { jobs: nextJobs, result, write = true } = await update(jobs)
+
+    if (write) {
+      await writeScheduledEmails(nextJobs, queueFile)
+    }
+
+    return result
+  } finally {
+    await rm(lockDirectory, { recursive: true, force: true })
+  }
+}
+
+export function parseSchedule(schedule, now = new Date()) {
+  let value = schedule
+
+  if (schedule && typeof schedule === "object" && !Array.isArray(schedule)) {
+    value = schedule.sendAt
+  }
+
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error("schedule must be an ISO date string or an object with sendAt")
+  }
+
+  const sendAt = new Date(value)
+
+  if (Number.isNaN(sendAt.getTime())) {
+    throw new Error("schedule must be a valid date/time")
+  }
+
+  if (sendAt <= now) {
+    throw new Error("schedule must be in the future")
+  }
+
+  return sendAt.toISOString()
+}
+
+export function nextScheduledEmailId(jobs) {
+  const highestId = jobs.reduce((highest, job) => {
+    return Number.isInteger(job.id) && job.id > highest ? job.id : highest
+  }, 0)
+
+  if (highestId >= MAX_SCHEDULED_EMAIL_ID) {
+    throw new Error("scheduled email queue supports ids from 1 to 100")
+  }
+
+  return highestId + 1
+}
+
+export async function enqueueScheduledEmail(input, options = {}) {
+  const queueFile = options.queueFile ?? DEFAULT_QUEUE_FILE
+  const now = options.now ?? new Date()
+  const sendAt = parseSchedule(input.schedule, now)
+
+  return updateScheduledEmails(queueFile, async (jobs) => {
+    const job = {
+      id: nextScheduledEmailId(jobs),
+      createdAt: now.toISOString(),
+      sendAt,
+      email: {
+        to: input.to,
+        subject: input.subject,
+        body: input.body,
+        attachments: input.attachments ?? [],
+      },
+    }
+
+    jobs.push(job)
+    jobs.sort((left, right) => Date.parse(left.sendAt) - Date.parse(right.sendAt))
+
+    return {
+      jobs,
+      result: {
+        scheduled: true,
+        jobId: job.id,
+        sendAt,
+      },
+    }
+  })
+}
+
 export async function sendEmail(input, options = {}) {
+  if (input.schedule !== undefined && input.schedule !== null) {
+    return enqueueScheduledEmail(input, options)
+  }
+
   const env = options.env ?? process.env
   const createTransport = options.createTransport ?? nodemailer.createTransport
   const config = createSmtpConfig(env)

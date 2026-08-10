@@ -93,7 +93,7 @@ Look for explicit profile content that identifies:
 - Candidate name.
 - Professional summary or experience paragraph.
 - Custom signature.
-- Attachment paths for CV, resume, portfolio, or other files.
+- Attachment paths for CV, resume, portfolio, or other files. Paths may be relative to the repository or absolute local paths.
 - Location, availability, salary expectation, language level, or other application facts when a job specifically asks for them.
 
 Do not read `profile/documents/`, resumes, CVs, LinkedIn exports, or supplemental files while sending emails.
@@ -180,14 +180,14 @@ Rules:
 
 ## Attachments
 
-Use attachment paths only when they are explicitly configured in `profile/job-profile.md`.
+Use attachment paths only when they are explicitly configured in `profile/job-profile.md`. Bracketed placeholder examples such as `[CV or resume path]` are not configured paths.
 
 If a job asks for an attachment:
 
 1. Find a matching attachment path in `profile/job-profile.md`.
 2. Verify the file exists before sending.
 3. Pass the path through the MCP `attachments` field.
-4. Skip the job if the path is missing or the file does not exist.
+4. Skip the job if the path is missing, still a placeholder, or the file does not exist.
 
 If a job does not ask for an attachment, send with `attachments: []`.
 
@@ -195,7 +195,7 @@ Do not read attachment contents. Only verify that the path exists.
 
 ## MCP Tool Call
 
-Use the local email MCP tool. In OpenCode, this may be exposed as a tool named like `email_send_email`; the MCP tool itself is `send_email` under the configured `email` server.
+Use the local email MCP tool. Depending on the client, this may be exposed as a tool named like `email_send_email`; the MCP tool itself is `send_email` under the configured `email` server.
 
 Call it with:
 

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": {
+    "paths": [
+      ".claude/skills"
+    ]
+  },
+  "command": {
+    "setup": {
+      "description": "Generate or refresh profile/job-profile.md and profile/email-body-rules.md from onboarding information",
+      "template": "Use the setup-job-profile skill from .claude/skills to run profile onboarding for this WhatsApp job search project. Pass $ARGUMENTS through to the skill, including optional --section <name>. Ask for optional attachment paths for CVs, resumes, portfolios, or other application files; paths may be under profile/documents/ or any local path the user provides. Generate or refresh profile/job-profile.md and profile/email-body-rules.md only after user confirmation."
+    },
+    "reset": {
+      "description": "Reset local job profile data before running setup again",
+      "template": "Use the reset-job-profile skill from .claude/skills to reset local job profile data in this WhatsApp job search project. Pass $ARGUMENTS through as the optional scope: profile, documents, or all. The profile scope resets profile/job-profile.md and profile/email-body-rules.md. Do not modify or delete anything until the user confirms by typing exactly RESET."
+    },
+    "search-whatsapp-jobs": {
+      "description": "Search WhatsApp job postings through the local CLI",
+      "template": "Use the search-whatsapp-jobs skill from .claude/skills to search WhatsApp job postings in this project. Treat $ARGUMENTS as the optional hours value. If $ARGUMENTS is provided, use it as the CLI hours argument. If it is empty, follow the skill's interactive hours flow. Run the required Docker and local CLI workflow, validate output/jobs-email.json, and report lastRun, hoursConsulted, and total."
+    },
+    "filter-whatsapp-jobs": {
+      "description": "Filter WhatsApp job postings against the local job profile",
+      "template": "Use the filter-whatsapp-jobs skill from .claude/skills to filter output/jobs-email.json against profile/job-profile.md. Do not read profile/documents/ or any resumes, CVs, LinkedIn exports, or supplemental files while filtering. Write output/filtered-jobs.json with only compatible jobs, preserve sender, text, and timestamp, add send: false to every kept job, never set send: true, do not add reason, do not modify output/jobs-email.json, validate the result, and report sourceTotal, total, and the output path."
+    },
+    "job-search-pipeline": {
+      "description": "Search WhatsApp jobs and then filter them against the local profile",
+      "template": "Run the full WhatsApp job search pipeline in this project. First use the search-whatsapp-jobs skill from .claude/skills with $ARGUMENTS as the optional hours value. If $ARGUMENTS is empty, follow the skill's interactive hours flow. After output/jobs-email.json is valid, use the filter-whatsapp-jobs skill from .claude/skills to read profile/job-profile.md and create output/filtered-jobs.json. Do not read profile/documents/ during filtering. Validate both outputs and report lastRun, hoursConsulted, sourceTotal, total, and the output paths."
+    },
+    "send-job-emails": {
+      "description": "Send job application emails for filtered WhatsApp jobs through the email MCP",
+      "template": "Use the send-job-emails skill from .claude/skills to send professional job application emails for jobs in output/filtered-jobs.json. Pass $ARGUMENTS through as the send mode: confirm or auto. Use confirm mode to build and show the batch before sending. Use auto mode to send automatically after validation. Read profile/job-profile.md for candidate details and profile/email-body-rules.md for email language, tone, structure, and wording preferences. Never read profile/documents/, never modify output/jobs-email.json, use the email MCP send_email tool for sending, and mark jobs as send: true in output/filtered-jobs.json only after successful MCP sends."
+    }
+  },
+  "mcp": {
+    "email": {
+      "type": "local",
+      "command": ["npm", "--prefix", "mcp", "start"],
+      "enabled": true,
+      "environment": {
+        "SMTP_HOST": "${SMTP_HOST}",
+        "SMTP_PORT": "${SMTP_PORT}",
+        "SMTP_USER": "${SMTP_USER}",
+        "SMTP_PASS": "${SMTP_PASS}",
+        "SMTP_FROM": "${SMTP_FROM}"
+      }
+    }
+  }
+}

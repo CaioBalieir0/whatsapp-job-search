@@ -31,7 +31,7 @@ output/filtered-jobs.json
 
 ## Setup Flow
 
-Run this from your agent CLI at the repository root:
+Run this from Claude Code or your compatible agent CLI at the repository root:
 
 ```text
 /setup
@@ -62,7 +62,7 @@ Keep candidate facts in `job-profile.md`:
 - Technologies, tools, domains, and experience.
 - Work mode, location, timezone, language, contract, and salary preferences.
 - Hard rejection rules and deal-breakers.
-- Attachment paths for CVs, portfolios, or other application files.
+- Optional attachment paths for CVs, portfolios, or other application files. Paths can be under `profile/documents/` or anywhere local.
 
 Keep email-writing preferences in `email-body-rules.md`:
 
@@ -112,6 +112,7 @@ If a profile file still contains placeholders, replace them before filtering job
 | `[Remote preferred]` | Remote, hybrid, on-site, location, or timezone preferences. |
 | `[Full-time employment]` | Employment, contract, freelance, internship, or schedule constraints. |
 | `[English accepted]` | Languages you accept or reject. |
+| `[CV or resume path]` | A local attachment path, such as `profile/documents/cv.pdf` or an absolute path outside the repository. |
 | `[Exclude weak or ambiguous matches]` | Any personal rule that should affect filtering. |
 
 ## Privacy

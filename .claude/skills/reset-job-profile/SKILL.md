@@ -21,7 +21,7 @@ Supported reset scopes:
 | `documents` | Delete user-provided files and folders under `profile/documents/`, preserving `profile/documents/README.md` and the `profile/documents/` folder. |
 | `all` | Reset both profile and documents. |
 
-This project does not use legacy `.claude/skills/job-application-assistant/` profile files or structured `documents/cv/`, `documents/linkedin/`, `documents/diplomas/`, `documents/references/`, or `documents/applications/` folders. Do not create, inspect, or reset those paths.
+This project does not use legacy `job-application-assistant` profile files or structured `documents/cv/`, `documents/linkedin/`, `documents/diplomas/`, `documents/references/`, or `documents/applications/` folders. Do not create, inspect, or reset those paths.
 
 ## Step 0: Parse Scope From Arguments
 
@@ -173,6 +173,13 @@ This file is the profile source used by the filtering skill. To generate or refr
 - [Local language accepted]
 - [Additional languages accepted only if optional]
 
+## Attachments
+
+- [CV or resume path, for example `profile/documents/cv.pdf` or `/absolute/path/to/cv.pdf`]
+- [Portfolio or other attachment path, if applicable]
+- [When to attach each file, if multiple attachments are configured]
+- Do not attach files unless the job asks for a CV/resume attachment or I explicitly request attachments.
+
 ## Decision Rules
 
 - [Exclude weak or ambiguous matches]
@@ -317,4 +324,4 @@ Both your job profile and documents folder are now blank. Add documents to `prof
 - Never modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 - Never run the WhatsApp search CLI.
 - Never inspect Docker, WhatsApp, Evolution API, or generated search data.
-- Never reset legacy `.claude/skills/job-application-assistant/` files for this project.
+- Never reset legacy `job-application-assistant` files for this project.

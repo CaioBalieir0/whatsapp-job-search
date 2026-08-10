@@ -58,6 +58,14 @@ This file is the only profile source used by the filtering skill. To generate or
 - [Local language accepted]
 - [Additional languages accepted only if optional]
 
+## Attachments
+
+- [CV or resume path, for example `profile/documents/cv.pdf` or `/absolute/path/to/cv.pdf`]
+- [Portfolio or other attachment path, if applicable]
+- [When to attach each file, if multiple attachments are configured]
+- When a job asks for a CV, resume, or curriculum without specifying a specialization, attach the most relevant configured file based on the role text.
+- Do not attach files unless the job asks for a CV/resume attachment or I explicitly request attachments.
+
 ## Decision Rules
 
 - [Exclude weak or ambiguous matches]
