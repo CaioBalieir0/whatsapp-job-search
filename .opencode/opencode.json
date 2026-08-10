@@ -10,8 +10,8 @@
       "template": "Use the reset-job-profile skill to reset local job profile data in this WhatsApp job search project. Pass $ARGUMENTS through as the optional scope: profile, documents, or all. The profile scope resets profile/job-profile.md and profile/email-body-rules.md. Do not modify or delete anything until the user confirms by typing exactly RESET."
     },
     "search-whatsapp-jobs": {
-      "description": "Search WhatsApp job postings through the n8n webhook",
-      "template": "Use the search-whatsapp-jobs skill to search WhatsApp job postings in this n8n project. Treat $ARGUMENTS as the optional hours value. If $ARGUMENTS is provided, use it as the webhook hours parameter. If it is empty, follow the skill's interactive hours flow. Run the required Docker and webhook workflow, validate output/jobs-email.json, and report lastRun, hoursConsulted, and total."
+      "description": "Search WhatsApp job postings through the local CLI",
+      "template": "Use the search-whatsapp-jobs skill to search WhatsApp job postings in this project. Treat $ARGUMENTS as the optional hours value. If $ARGUMENTS is provided, use it as the CLI hours argument. If it is empty, follow the skill's interactive hours flow. Run the required Docker and local CLI workflow, validate output/jobs-email.json, and report lastRun, hoursConsulted, and total."
     },
     "filter-whatsapp-jobs": {
       "description": "Filter WhatsApp job postings against the local job profile",
@@ -19,7 +19,7 @@
     },
     "job-search-pipeline": {
       "description": "Search WhatsApp jobs and then filter them against the local profile",
-      "template": "Run the full WhatsApp job search pipeline in this n8n project. First use the search-whatsapp-jobs skill with $ARGUMENTS as the optional hours value. If $ARGUMENTS is empty, follow the skill's interactive hours flow. After output/jobs-email.json is valid, use the filter-whatsapp-jobs skill to read profile/job-profile.md and create output/filtered-jobs.json. Do not read profile/documents/ during filtering. Validate both outputs and report lastRun, hoursConsulted, sourceTotal, total, and the output paths."
+      "template": "Run the full WhatsApp job search pipeline in this project. First use the search-whatsapp-jobs skill with $ARGUMENTS as the optional hours value. If $ARGUMENTS is empty, follow the skill's interactive hours flow. After output/jobs-email.json is valid, use the filter-whatsapp-jobs skill to read profile/job-profile.md and create output/filtered-jobs.json. Do not read profile/documents/ during filtering. Validate both outputs and report lastRun, hoursConsulted, sourceTotal, total, and the output paths."
     },
     "send-job-emails": {
       "description": "Send job application emails for filtered WhatsApp jobs through the email MCP",

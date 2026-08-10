@@ -1,3 +1,4 @@
+.env
 output/
 profile/documents/*
 !profile/documents/README.md

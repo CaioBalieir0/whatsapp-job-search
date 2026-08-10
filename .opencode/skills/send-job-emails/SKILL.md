@@ -8,7 +8,7 @@ description: Use when the user asks to send job application emails for filtered 
 
 Send professional job application emails for compatible jobs already filtered into `output/filtered-jobs.json`. Use `profile/job-profile.md` for candidate details, `profile/email-body-rules.md` for email writing preferences, and the local email MCP tool to send email.
 
-Do not search WhatsApp, call n8n, filter jobs, read `profile/documents/`, or modify `output/jobs-email.json`.
+Do not search WhatsApp, run the WhatsApp search CLI, filter jobs, read `profile/documents/`, or modify `output/jobs-email.json`.
 
 ## Required Workflow
 

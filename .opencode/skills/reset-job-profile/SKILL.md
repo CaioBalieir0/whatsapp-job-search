@@ -315,6 +315,6 @@ Both your job profile and documents folder are now blank. Add documents to `prof
 - Never delete `profile/documents/README.md`.
 - Never delete the `profile/documents/` folder itself.
 - Never modify `output/jobs-email.json` or `output/filtered-jobs.json`.
-- Never call the n8n webhook.
-- Never inspect Docker, WhatsApp, Evolution API, or n8n execution data.
+- Never run the WhatsApp search CLI.
+- Never inspect Docker, WhatsApp, Evolution API, or generated search data.
 - Never reset legacy `.claude/skills/job-application-assistant/` files for this project.

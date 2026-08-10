@@ -1,0 +1,11 @@
+{
+  "name": "whatsapp-job-search",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "search": "node scripts/search-whatsapp-jobs.mjs",
+    "check": "node --check scripts/search-whatsapp-jobs.mjs && node --check scripts/search-whatsapp-jobs.test.mjs",
+    "test": "node --test scripts/search-whatsapp-jobs.test.mjs"
+  }
+}

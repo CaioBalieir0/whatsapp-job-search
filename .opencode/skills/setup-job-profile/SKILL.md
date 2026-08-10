@@ -9,7 +9,7 @@ description: Use when the user runs /setup, asks to generate profile/job-profile
 
 Run onboarding for this WhatsApp job search workspace. Collect the user's professional information and generate or refresh `profile/job-profile.md` so `/filter-whatsapp-jobs` can evaluate jobs from `output/jobs-email.json`. Also generate or refresh `profile/email-body-rules.md` so `/send-job-emails` can write email bodies using user-editable language, tone, and structure preferences.
 
-This skill is for profile setup only. Do not filter jobs, do not send emails, do not call the n8n webhook, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
+This skill is for profile setup only. Do not filter jobs, do not send emails, do not run the WhatsApp search CLI, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 
 ## Core Contract
 

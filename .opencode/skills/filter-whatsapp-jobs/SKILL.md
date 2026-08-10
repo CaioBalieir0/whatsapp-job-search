@@ -1,6 +1,6 @@
 ---
 name: filter-whatsapp-jobs
-description: Use when the user asks to filter WhatsApp job postings, match output/jobs-email.json against profile/job-profile.md, or create output/filtered-jobs.json in this n8n project.
+description: Use when the user asks to filter WhatsApp job postings, match output/jobs-email.json against profile/job-profile.md, or create output/filtered-jobs.json in this project.
 ---
 
 # Filter WhatsApp Jobs
@@ -18,7 +18,7 @@ Filter the raw WhatsApp job postings using the user's local job profile. Keep on
 5. Write `output/filtered-jobs.json` with the required schema.
 6. Report `sourceTotal`, `total`, and the output path.
 
-Do not call WhatsApp, Evolution API, n8n execution history, databases, or Docker volumes. This skill only filters the local JSON file already produced by the search workflow.
+Do not call WhatsApp, Evolution API, databases, or Docker volumes. This skill only filters the local JSON file already produced by the search workflow.
 
 ## Inputs
 
