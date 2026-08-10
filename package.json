@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "search": "node scripts/search-whatsapp-jobs.mjs",
-    "check": "node --check scripts/search-whatsapp-jobs.mjs && node --check scripts/search-whatsapp-jobs.test.mjs",
-    "test": "node --test scripts/search-whatsapp-jobs.test.mjs"
+    "check": "node --check scripts/search-whatsapp-jobs.mjs && node --check scripts/search-whatsapp-jobs.test.mjs && node --check tools/lint_skills.mjs && node --check tools/security_guards.mjs && node --check tools/ci-guards.test.mjs",
+    "test": "node --test scripts/search-whatsapp-jobs.test.mjs tools/ci-guards.test.mjs"
   }
 }
