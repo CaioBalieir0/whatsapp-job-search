@@ -5,4 +5,3 @@ profile/documents/**
 !profile/documents/README.md
 mcp/scheduled-emails.json
 node_modules
-.opencode/
