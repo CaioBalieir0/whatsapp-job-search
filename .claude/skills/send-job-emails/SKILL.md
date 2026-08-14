@@ -1,29 +1,29 @@
 ---
 name: send-job-emails
-description: Use when the user asks to send job application emails for filtered WhatsApp jobs, process output/filtered-jobs.json, or use the email MCP tool for job applications in this project.
+description: Use when the user asks to send job application emails for filtered WhatsApp jobs, direct job texts, output/filtered-jobs.json, or the email MCP tool in this project.
 ---
 # Send Job Emails
 
 ## Overview
 
-Send professional job application emails for compatible jobs already filtered into `output/filtered-jobs.json`. Use `profile/job-profile.md` for candidate details, `profile/email-body-rules.md` for email writing preferences, and the local email MCP tool to send email.
+Send professional job application emails for compatible jobs already filtered into `output/filtered-jobs.json`, selected by index from that file, or provided directly in the command. Use `profile/job-profile.md` for candidate details, `profile/email-body-rules.md` for email writing preferences, and the local email MCP tool to send email.
 
 Do not search WhatsApp, run the WhatsApp search CLI, filter jobs, read `profile/documents/`, or modify `output/jobs-email.json`.
 
 ## Required Workflow
 
-1. Determine the send mode from `$ARGUMENTS`: `confirm` or `auto`.
+1. Parse `$ARGUMENTS` into send mode and optional job target: `confirm` or `auto`, then indexes or direct job text.
 2. Read `profile/job-profile.md`.
 3. Read `profile/email-body-rules.md`.
-4. Read and validate `output/filtered-jobs.json`.
-5. Select only jobs where `send` is `false`.
-6. For each selected job, analyze `jobs[].text` for application email instructions.
+4. If no direct job text was provided, read and validate `output/filtered-jobs.json`.
+5. Select jobs from the requested source, processing only file jobs where `send` is `false`.
+6. For each selected job, analyze the selected job text for application email instructions.
 7. Build sendable drafts only when all required data is clear.
 8. In `confirm` mode, show the full batch of drafts and wait for approval before sending.
 9. In `auto` mode, send without draft approval after validation.
 10. Send with the MCP email tool `send_email`.
-11. Mark `send: true` only after a successful MCP response.
-12. Validate `output/filtered-jobs.json` after updates.
+11. For file jobs, mark `send: true` only after a successful MCP response.
+12. Validate `output/filtered-jobs.json` after updates when file jobs were sent.
 13. Report `eligible`, `skipped`, `sent`, `failed`, and the output path.
 
 ## Mode Selection
@@ -47,6 +47,29 @@ Choose an email sending mode:
 ```
 
 Do not guess the mode when it is missing.
+
+## Job Target Selection
+
+After removing the optional send mode from `$ARGUMENTS`, interpret the remaining arguments as the job target.
+
+Supported target forms:
+
+| Target form | Example | Behavior |
+| --- | --- | --- |
+| Empty | `/send-job-emails confirm` | Read `output/filtered-jobs.json` and process every job where `send` is `false`. |
+| Numeric indexes | `/send-job-emails confirm 1 3 5` | Read `output/filtered-jobs.json` and process only those 1-based job indexes when their `send` value is `false`. |
+| Direct job text | `/send-job-emails confirm vaga backend... enviar CV para jobs@example.com` | Treat the remaining text as one or more temporary jobs provided directly by the user. |
+
+Rules:
+
+- Treat targets as numeric indexes only when every remaining argument is a positive integer.
+- Indexes are 1-based and refer to the order of `jobs` in `output/filtered-jobs.json`.
+- If any index is out of range, skip it and report `invalid job index`.
+- If the remaining arguments contain non-numeric text, treat all remaining text as direct job text.
+- For direct job text, create temporary job objects with the provided text, `sender: "direct input"`, and `send: false`. A timestamp is not required for sending logic.
+- Do not read or validate `output/filtered-jobs.json` when processing only direct job text.
+- Do not update `output/filtered-jobs.json` for direct job text, even after successful sends.
+- If direct job text appears to include multiple postings, split only on clear separators such as blank lines between postings. Do not split aggressively when uncertain.
 
 ## Inputs
 
@@ -80,7 +103,7 @@ output/filtered-jobs.json
 - Every item in `jobs` must contain `timestamp` as a number.
 - Every item in `jobs` must contain `send` as a boolean.
 
-Only process jobs where `send` is `false`. Ignore jobs where `send` is `true`.
+Only process file jobs where `send` is `false`. Ignore file jobs where `send` is `true`. Direct job text is always treated as pending because it is not stored in `output/filtered-jobs.json`.
 
 ## Profile Rules
 
@@ -104,7 +127,7 @@ If `profile/email-body-rules.md` is missing or does not contain language and bod
 
 ## Email Extraction Rules
 
-Extract email addresses only from `jobs[].text`.
+Extract email addresses only from the selected job text.
 
 Send only when the email appears related to job applications. Prefer email addresses near words such as:
 
@@ -214,7 +237,9 @@ Treat tool errors, rejected recipients, or missing accepted recipients as failur
 
 ## Updating `output/filtered-jobs.json`
 
-After a successful send, update only the matching job's `send` value from `false` to `true`.
+After a successful send for a job selected from `output/filtered-jobs.json`, update only the matching job's `send` value from `false` to `true`.
+
+Do not update `output/filtered-jobs.json` after sending direct job text provided in `$ARGUMENTS`.
 
 Do not change:
 
@@ -293,8 +318,9 @@ Use short skipped reasons:
 
 | Situation | Action |
 | --- | --- |
-| `send` is `true` | Ignore the job |
+| `send` is `true` on a file job | Ignore the job |
 | `send` is `false` and email is clear | Build a draft |
+| Direct job text is provided | Build drafts from the text and do not update `output/filtered-jobs.json` |
 | `profile/email-body-rules.md` is missing or incomplete | Skip sending and ask the user to run `/setup` or edit the file |
 | Job specifies subject | Use the exact subject |
 | Job asks for an attachment | Use only paths from `profile/job-profile.md` and verify existence |
@@ -307,7 +333,7 @@ Use short skipped reasons:
 
 - Do not read `profile/documents/` while sending emails.
 - Do not embed a hard-coded email body template when `profile/email-body-rules.md` provides the user's preferences.
-- Do not send jobs that were not already filtered into `output/filtered-jobs.json`.
+- Do not send jobs outside `output/filtered-jobs.json` unless they were provided directly in `$ARGUMENTS`.
 - Do not send jobs already marked with `send: true`.
 - Do not modify `output/jobs-email.json`.
 - Do not invent missing candidate facts.
