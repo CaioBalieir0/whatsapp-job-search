@@ -16,6 +16,38 @@ import {
 import { processDueEmails, startEmailWorker } from "./email-worker.mjs"
 import { createHttpServer } from "./http-server.mjs"
 
+function createFakeRedisClient() {
+  const sortedSets = new Map()
+
+  function getSet(key) {
+    if (!sortedSets.has(key)) {
+      sortedSets.set(key, new Map())
+    }
+
+    return sortedSets.get(key)
+  }
+
+  return {
+    async zAdd(key, entries) {
+      const set = getSet(key)
+
+      for (const entry of entries) {
+        set.set(entry.value, entry.score)
+      }
+    },
+    async zRange(key, start, stop) {
+      const values = Array.from(getSet(key).entries())
+        .sort((left, right) => left[1] - right[1])
+        .map(([value]) => value)
+
+      return values.slice(start, stop === -1 ? undefined : stop + 1)
+    },
+    async del(key) {
+      sortedSets.delete(key)
+    },
+  }
+}
+
 async function withTempQueue(run) {
   const directory = await mkdtemp(path.join(tmpdir(), "email-queue-"))
   const queueFile = path.join(directory, "scheduled-emails.json")
@@ -163,6 +195,35 @@ test("enqueueScheduledEmail persists an email job without the schedule field", a
   })
 })
 
+test("enqueueScheduledEmail persists scheduled jobs in Redis when a Redis client is configured", async () => {
+  const redisClient = createFakeRedisClient()
+  const queue = { redisClient, redisKey: "test:scheduled-emails" }
+
+  const result = await enqueueScheduledEmail(
+    {
+      to: "recipient@example.com",
+      subject: "Scheduled subject",
+      body: "Scheduled body",
+      attachments: ["/tmp/report.pdf"],
+      schedule: "2026-08-09T21:00:00.000Z",
+    },
+    { queue, now: new Date("2026-08-09T20:00:00.000Z") },
+  )
+
+  const jobs = await readScheduledEmails(queue)
+
+  assert.equal(result.scheduled, true)
+  assert.equal(result.sendAt, "2026-08-09T21:00:00.000Z")
+  assert.equal(jobs.length, 1)
+  assert.equal(jobs[0].id, result.jobId)
+  assert.deepEqual(jobs[0].email, {
+    to: "recipient@example.com",
+    subject: "Scheduled subject",
+    body: "Scheduled body",
+    attachments: ["/tmp/report.pdf"],
+  })
+})
+
 test("enqueueScheduledEmail assigns increasing numeric ids from 1 to 100", async () => {
   await withTempQueue(async (queueFile) => {
     const first = await enqueueScheduledEmail(
@@ -303,6 +364,47 @@ test("processDueEmails sends expired jobs and removes each successful email from
     assert.deepEqual(sent.map((email) => email.to), ["due@example.com"])
     assert.deepEqual(jobs.map((job) => job.email.to), ["future@example.com"])
   })
+})
+
+test("processDueEmails sends expired jobs and removes each successful email from Redis", async () => {
+  const redisClient = createFakeRedisClient()
+  const queue = { redisClient, redisKey: "test:scheduled-emails" }
+
+  await enqueueScheduledEmail(
+    {
+      to: "due@example.com",
+      subject: "Due subject",
+      body: "Due body",
+      attachments: [],
+      schedule: "2026-08-09T20:59:00.000Z",
+    },
+    { queue, now: new Date("2026-08-09T20:00:00.000Z") },
+  )
+  await enqueueScheduledEmail(
+    {
+      to: "future@example.com",
+      subject: "Future subject",
+      body: "Future body",
+      attachments: [],
+      schedule: "2026-08-09T22:00:00.000Z",
+    },
+    { queue, now: new Date("2026-08-09T20:00:00.000Z") },
+  )
+
+  const sent = []
+  const result = await processDueEmails({
+    queue,
+    now: new Date("2026-08-09T21:00:00.000Z"),
+    send: async (email) => {
+      sent.push(email)
+      return { messageId: "message-123", accepted: [email.to], rejected: [] }
+    },
+  })
+  const jobs = await readScheduledEmails(queue)
+
+  assert.deepEqual(result, { processed: 1, sent: 1, failed: 0 })
+  assert.deepEqual(sent.map((email) => email.to), ["due@example.com"])
+  assert.deepEqual(jobs.map((job) => job.email.to), ["future@example.com"])
 })
 
 test("processDueEmails keeps failed jobs in JSON for a later poll", async () => {

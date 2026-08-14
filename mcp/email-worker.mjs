@@ -2,7 +2,7 @@
 
 import { pathToFileURL } from "node:url"
 
-import { DEFAULT_QUEUE_FILE, sendEmail, updateScheduledEmails } from "./email-server.mjs"
+import { DEFAULT_QUEUE_FILE, getScheduledEmailQueue, sendEmail, updateScheduledEmails } from "./email-server.mjs"
 
 export const POLL_INTERVAL_MS = 10 * 60 * 1000
 
@@ -16,7 +16,7 @@ function errorMessage(error) {
 }
 
 export async function processDueEmails(options = {}) {
-  const queueFile = options.queueFile ?? DEFAULT_QUEUE_FILE
+  const queueFile = await getScheduledEmailQueue(options)
   const now = options.now ?? new Date()
   const send = options.send ?? ((email) => sendEmail(email))
 
@@ -57,7 +57,7 @@ export async function processDueEmails(options = {}) {
 }
 
 export function startEmailWorker(options = {}) {
-  const queueFile = options.queueFile ?? DEFAULT_QUEUE_FILE
+  const queueFile = options.queue ?? options.queueFile ?? DEFAULT_QUEUE_FILE
   const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS
   const processDue = options.processDue ?? processDueEmails
   let stopped = false

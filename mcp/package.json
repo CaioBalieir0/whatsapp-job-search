@@ -13,6 +13,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "latest",
     "nodemailer": "latest",
+    "redis": "^6.2.1",
     "zod": "latest"
   }
 }

@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import nodemailer from "nodemailer"
+import { createClient } from "redis"
 import { z } from "zod"
 
 const emailInputSchema = {
@@ -22,9 +23,11 @@ const requiredEnv = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_F
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
 
 export const DEFAULT_QUEUE_FILE = process.env.EMAIL_QUEUE_FILE ?? path.join(moduleDirectory, "scheduled-emails.json")
+export const DEFAULT_REDIS_KEY = process.env.EMAIL_REDIS_KEY ?? "email-mcp:scheduled-emails"
 const MAX_SCHEDULED_EMAIL_ID = 100
 const LOCK_RETRY_MS = 50
 const LOCK_TIMEOUT_MS = 5000
+let defaultRedisClient = null
 
 export function createSmtpConfig(env = process.env) {
   const missing = requiredEnv.filter((name) => !env[name])
@@ -69,7 +72,64 @@ export function buildMailOptions(input, from) {
   }
 }
 
+function isRedisQueue(queue) {
+  return Boolean(queue && typeof queue === "object" && queue.redisClient)
+}
+
+export async function getScheduledEmailQueue(options = {}) {
+  if (options.queue) {
+    return options.queue
+  }
+
+  const redisUrl = options.redisUrl ?? process.env.EMAIL_REDIS_URL ?? process.env.REDIS_URL
+
+  if (!redisUrl) {
+    return options.queueFile ?? DEFAULT_QUEUE_FILE
+  }
+
+  if (!defaultRedisClient) {
+    defaultRedisClient = createClient({ url: redisUrl })
+    await defaultRedisClient.connect()
+  }
+
+  return {
+    redisClient: defaultRedisClient,
+    redisKey: options.redisKey ?? DEFAULT_REDIS_KEY,
+  }
+}
+
+function parseRedisJobs(values) {
+  return values.map((value) => JSON.parse(value))
+}
+
+async function readScheduledEmailsFromRedis(queue) {
+  const values = await queue.redisClient.zRange(queue.redisKey ?? DEFAULT_REDIS_KEY, 0, -1)
+
+  return parseRedisJobs(values)
+}
+
+async function writeScheduledEmailsToRedis(jobs, queue) {
+  const redisKey = queue.redisKey ?? DEFAULT_REDIS_KEY
+  await queue.redisClient.del(redisKey)
+
+  if (jobs.length === 0) {
+    return
+  }
+
+  await queue.redisClient.zAdd(
+    redisKey,
+    jobs.map((job) => ({
+      score: Date.parse(job.sendAt),
+      value: JSON.stringify(job),
+    })),
+  )
+}
+
 export async function readScheduledEmails(queueFile = DEFAULT_QUEUE_FILE) {
+  if (isRedisQueue(queueFile)) {
+    return readScheduledEmailsFromRedis(queueFile)
+  }
+
   try {
     const contents = await readFile(queueFile, "utf8")
 
@@ -94,6 +154,11 @@ export async function readScheduledEmails(queueFile = DEFAULT_QUEUE_FILE) {
 }
 
 export async function writeScheduledEmails(jobs, queueFile = DEFAULT_QUEUE_FILE) {
+  if (isRedisQueue(queueFile)) {
+    await writeScheduledEmailsToRedis(jobs, queueFile)
+    return
+  }
+
   await mkdir(path.dirname(queueFile), { recursive: true })
 
   const temporaryFile = `${queueFile}.${process.pid}.${Date.now()}.tmp`
@@ -102,6 +167,17 @@ export async function writeScheduledEmails(jobs, queueFile = DEFAULT_QUEUE_FILE)
 }
 
 export async function updateScheduledEmails(queueFile, update) {
+  if (isRedisQueue(queueFile)) {
+    const jobs = await readScheduledEmails(queueFile)
+    const { jobs: nextJobs, result, write = true } = await update(jobs)
+
+    if (write) {
+      await writeScheduledEmails(nextJobs, queueFile)
+    }
+
+    return result
+  }
+
   const lockDirectory = `${queueFile}.lock`
   const startedAt = Date.now()
   let locked = false
@@ -174,7 +250,7 @@ export function nextScheduledEmailId(jobs) {
 }
 
 export async function enqueueScheduledEmail(input, options = {}) {
-  const queueFile = options.queueFile ?? DEFAULT_QUEUE_FILE
+  const queueFile = await getScheduledEmailQueue(options)
   const now = options.now ?? new Date()
   const sendAt = parseSchedule(input.schedule, now)
 

@@ -4,36 +4,36 @@ services:
   postgres:
     image: postgres:16
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-evolution}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evolution_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-evolution}
+    env_file: .env
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${REDIS_BIND}:${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
 
   evolution-api:
     image: evoapicloud/evolution-api:latest
     restart: unless-stopped
+    env_file: .env
     ports:
-      - "8080:8080"
+      - "${EVOLUTION_API_PORT}:8080"
     environment:
-      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-change-this-api-key}
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER:-evolution}:${POSTGRES_PASSWORD:-evolution_pass}@postgres:5432/${POSTGRES_DB:-evolution}
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - WEBHOOK_GLOBAL_ENABLED=false
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://redis:6379
       - CACHE_REDIS_PREFIX_KEY=evolution
       - CACHE_LOCAL_ENABLED=false
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/Sao_Paulo}
     volumes:
       - evolution_instances:/evolution/instances
     depends_on:
@@ -45,41 +45,31 @@ services:
       - mcp
     build:
       context: ./mcp
+      args:
+        MCP_HTTP_PORT: ${MCP_HTTP_PORT}
     restart: unless-stopped
+    env_file: .env
     ports:
-      - "${MCP_HTTP_BIND:-127.0.0.1}:${MCP_HTTP_PORT:-3333}:3333"
+      - "${MCP_HTTP_BIND}:${MCP_HTTP_PORT}:${MCP_HTTP_PORT}"
     environment:
-      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - MCP_HTTP_HOST=0.0.0.0
-      - MCP_HTTP_PORT=3333
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
-      - EMAIL_QUEUE_FILE=/mcp/data/scheduled-emails.json
-    volumes:
-      - email_mcp_data:/mcp/data
+    depends_on:
+      - redis
 
   email-worker:
     profiles:
       - mcp
     build:
       context: ./mcp
+      args:
+        MCP_HTTP_PORT: ${MCP_HTTP_PORT}
     restart: unless-stopped
     command: ["npm", "run", "worker"]
-    environment:
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASS=${SMTP_PASS:-}
-      - SMTP_FROM=${SMTP_FROM:-}
-      - EMAIL_QUEUE_FILE=/mcp/data/scheduled-emails.json
-    volumes:
-      - email_mcp_data:/mcp/data
+    env_file: .env
+    depends_on:
+      - redis
 
 volumes:
   postgres_data:
   evolution_instances:
   redis_data:
-  email_mcp_data:

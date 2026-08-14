@@ -59,31 +59,9 @@ Copy the single environment reference and fill in your local values:
 cp .env.example .env
 ```
 
-Required search variables:
+The same root `.env` file provides Docker Compose defaults, search settings, SMTP credentials, and MCP settings. There is no separate `mcp/.env`; keep all runtime variables in the root `.env`.
 
-| Variable | Purpose |
-| --- | --- |
-| `EVOLUTION_API_URL` | Evolution API base URL, for example `http://localhost:8080`. |
-| `EVOLUTION_API_KEY` | API key used by Evolution API and the search CLI. |
-| `EVOLUTION_INSTANCE` | Evolution API instance name. |
-| `WHATSAPP_GROUP_JID` | WhatsApp group JID to search. |
-| `JOBS_OUTPUT_FILE` | Output path for raw search results. Defaults to `output/jobs-email.json`. |
-
-The same root `.env` file also provides Docker Compose defaults for Postgres, timezone, SMTP, and MCP settings. There is no separate `mcp/.env`; keep all runtime variables in the root `.env`.
-
-Optional email MCP variables:
-
-| Variable | Purpose |
-| --- | --- |
-| `SMTP_HOST` | SMTP host, for example `smtp.gmail.com`. |
-| `SMTP_PORT` | SMTP port, usually `587` or `465`. |
-| `SMTP_USER` | SMTP username. |
-| `SMTP_PASS` | SMTP password or app password. |
-| `SMTP_FROM` | Sender address for outgoing emails. |
-| `EMAIL_QUEUE_FILE` | Scheduled email queue path inside the MCP container. Defaults to `/mcp/data/scheduled-emails.json` in Docker. |
-| `MCP_AUTH_TOKEN` | Required bearer token for HTTP MCP access. Use a long random value. |
-| `MCP_HTTP_BIND` | Host address used by Docker port publishing. Defaults to `127.0.0.1`. |
-| `MCP_HTTP_PORT` | Published MCP HTTP port. Defaults to `3333`. |
+See [Environment Variables](#environment-variables) for the full variable reference, including how to choose JSON file or Redis storage for scheduled MCP emails.
 
 ### 3. Start the local WhatsApp stack
 
@@ -95,8 +73,8 @@ The default stack starts:
 
 | Service | Purpose | Local Port |
 | --- | --- | --- |
-| `postgres` | Persistence for Evolution API. | `5433` by default |
-| `redis` | Cache for Evolution API. | Not exposed |
+| `postgres` | Persistence for Evolution API. | `5432` by default |
+| `redis` | Cache for Evolution API and MCP email queue. | `6379`, bound to `127.0.0.1` by default |
 | `evolution-api` | WhatsApp integration service. | `8080` |
 The email MCP services are also defined in `docker-compose.yml`, but they are behind the `mcp` Compose profile, so they only start when requested:
 
@@ -212,6 +190,76 @@ curl -X POST http://127.0.0.1:3333/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
+
+## Environment Variables
+
+The root `.env.example` is the single reference for local configuration. Copy it to `.env`, fill in local values, and keep `.env` out of Git.
+
+```bash
+cp .env.example .env
+```
+
+### WhatsApp and Evolution API
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `EVOLUTION_API_URL` | Yes | Evolution API base URL used by the search CLI, for example `http://localhost:8080`. |
+| `EVOLUTION_API_KEY` | Yes | API key used by Evolution API and the search CLI. |
+| `EVOLUTION_INSTANCE` | Yes | Evolution API instance name connected to WhatsApp. |
+| `EVOLUTION_API_PORT` | Docker | Published Evolution API port. Defaults to `8080`. |
+| `WHATSAPP_GROUP_JID` | Yes | WhatsApp group JID to search. |
+| `JOBS_OUTPUT_FILE` | No | Output path for raw search results. Defaults to `output/jobs-email.json`. |
+
+### Docker Services
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `POSTGRES_USER` | Docker | Postgres user used by Evolution API. |
+| `POSTGRES_PASSWORD` | Docker | Postgres password used by Evolution API. |
+| `POSTGRES_DB` | Docker | Postgres database used by Evolution API. |
+| `POSTGRES_PORT` | Docker | Published Postgres port. Defaults to `5432`. |
+| `REDIS_BIND` | Docker | Host address used by Docker port publishing for Redis. Defaults to `127.0.0.1`. |
+| `REDIS_PORT` | Docker | Published Redis port. Defaults to `6379`. |
+| `GENERIC_TIMEZONE` | Docker | Timezone passed to Evolution API. Defaults to `America/Sao_Paulo`. |
+
+### SMTP Email Sending
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SMTP_HOST` | Email | SMTP host, for example `smtp.gmail.com`. |
+| `SMTP_PORT` | Email | SMTP port. Use `587` for STARTTLS or `465` for secure SMTP. |
+| `SMTP_USER` | Email | SMTP username, usually your email address. |
+| `SMTP_PASS` | Email | SMTP password or app password. For Gmail, use a Google app password. |
+| `SMTP_FROM` | Email | Sender address shown in outgoing email. Usually the same as `SMTP_USER`. |
+
+### MCP HTTP Server
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `MCP_AUTH_TOKEN` | HTTP MCP | Bearer token required by `POST /mcp`. Use a long random value. |
+| `MCP_HTTP_BIND` | Docker HTTP MCP | Host address used by Docker port publishing. Defaults to `127.0.0.1`. |
+| `MCP_HTTP_HOST` | HTTP MCP | Bind host inside the MCP process. Defaults to `0.0.0.0`. Docker Compose sets this for the container. |
+| `MCP_HTTP_PORT` | HTTP MCP | MCP HTTP port. Defaults to `3333`. |
+
+### MCP Scheduled Queue
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `EMAIL_QUEUE_FILE` | JSON queue | JSON file path for scheduled emails. Defaults to `mcp/scheduled-emails.json` when running locally and `/mcp/data/scheduled-emails.json` in the example Docker env. |
+| `EMAIL_REDIS_URL` | Redis queue | Redis URL for scheduled emails, for example `redis://redis:6379` in Docker or `redis://127.0.0.1:6379` locally. |
+| `REDIS_URL` | Redis queue | Fallback Redis URL used when `EMAIL_REDIS_URL` is not set. |
+| `EMAIL_REDIS_KEY` | Redis queue | Redis sorted-set key for scheduled emails. Defaults to `email-mcp:scheduled-emails`. |
+
+The MCP scheduled queue chooses Redis when `EMAIL_REDIS_URL` or `REDIS_URL` is set. If neither variable is set, it writes scheduled emails to the JSON file configured by `EMAIL_QUEUE_FILE`.
+
+To use Redis, keep these variables in `.env`:
+
+```dotenv
+EMAIL_REDIS_URL=redis://redis:6379
+EMAIL_REDIS_KEY=email-mcp:scheduled-emails
+```
+
+To use a JSON file instead, remove or comment out `EMAIL_REDIS_URL` and `REDIS_URL`, keep `EMAIL_QUEUE_FILE=/mcp/data/scheduled-emails.json`, and mount a persistent volume at `/mcp/data` for both `email-mcp` and `email-worker` if you run them with Docker.
 
 ## VPS MCP Compose
 
