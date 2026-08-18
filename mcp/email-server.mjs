@@ -21,6 +21,7 @@ const emailInputSchema = {
 
 const requiredEnv = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"]
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
+const defaultEnvFile = path.join(moduleDirectory, "..", ".env")
 
 export const DEFAULT_QUEUE_FILE = process.env.EMAIL_QUEUE_FILE ?? path.join(moduleDirectory, "scheduled-emails.json")
 export const DEFAULT_REDIS_KEY = process.env.EMAIL_REDIS_KEY ?? "email-mcp:scheduled-emails"
@@ -52,6 +53,37 @@ export function createSmtpConfig(env = process.env) {
     },
     from: env.SMTP_FROM,
   }
+}
+
+export async function loadEnvFile(envPath = defaultEnvFile, target = process.env) {
+  let content
+  try {
+    content = await readFile(envPath, "utf8")
+  } catch (error) {
+    if (error.code === "ENOENT") return target
+    throw error
+  }
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith("#")) continue
+
+    const separator = line.indexOf("=")
+    if (separator === -1) continue
+
+    const key = line.slice(0, separator).trim()
+    let value = line.slice(separator + 1).trim()
+
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+
+    if (key && target[key] === undefined) {
+      target[key] = value
+    }
+  }
+
+  return target
 }
 
 export function normalizeAttachments(attachments = []) {
@@ -288,6 +320,7 @@ export async function sendEmail(input, options = {}) {
 
   const env = options.env ?? process.env
   const createTransport = options.createTransport ?? nodemailer.createTransport
+  await loadEnvFile(options.envFile ?? defaultEnvFile, env)
   const config = createSmtpConfig(env)
   const transporter = createTransport({
     host: config.host,

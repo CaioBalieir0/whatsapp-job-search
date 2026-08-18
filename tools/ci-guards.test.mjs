@@ -7,7 +7,7 @@ import { runSecurityGuards } from './security_guards.mjs';
 test('lintSkills accepts skills with headings and matching command references', () => {
   const result = lintSkills({
     skills: new Map([
-      ['search-whatsapp-jobs', '# Search WhatsApp Jobs\n\nUse when searching jobs.'],
+      ['search-whatsapp-jobs', '# Search WhatsApp Jobs\n\nCheck connectionState, request QR Code with instance/connect, then search jobs.'],
       ['filter-whatsapp-jobs', '# Filter WhatsApp Jobs\n\nUse when filtering jobs.'],
     ]),
     opencodeConfig: {
@@ -24,7 +24,7 @@ test('lintSkills accepts skills with headings and matching command references', 
 test('lintSkills accepts skills with YAML frontmatter metadata before the title', () => {
   const result = lintSkills({
     skills: new Map([
-      ['search-whatsapp-jobs', '---\nname: search-whatsapp-jobs\ndescription: Use when searching jobs.\n---\n\n# Search WhatsApp Jobs\n'],
+      ['search-whatsapp-jobs', '---\nname: search-whatsapp-jobs\ndescription: Use when searching jobs.\n---\n\n# Search WhatsApp Jobs\n\nCheck connectionState, request QR Code with instance/connect, then search jobs.\n'],
     ]),
     opencodeConfig: { command: {} },
   });
@@ -32,10 +32,23 @@ test('lintSkills accepts skills with YAML frontmatter metadata before the title'
   assert.deepEqual(result.errors, []);
 });
 
+test('lintSkills requires WhatsApp connection guidance in search skill', () => {
+  const result = lintSkills({
+    skills: new Map([
+      ['search-whatsapp-jobs', '# Search WhatsApp Jobs\n\nRun npm run search.'],
+    ]),
+    opencodeConfig: { command: {} },
+  });
+
+  assert.deepEqual(result.errors, [
+    '.claude/skills/search-whatsapp-jobs/SKILL.md must verify WhatsApp connection and QR Code setup before searching',
+  ]);
+});
+
 test('lintSkills rejects missing titles and unknown command skill references', () => {
   const result = lintSkills({
     skills: new Map([
-      ['search-whatsapp-jobs', 'Use when searching jobs.'],
+      ['search-whatsapp-jobs', 'Use when searching jobs. Check connectionState, request QR Code with instance/connect, then search jobs.'],
     ]),
     opencodeConfig: {
       command: {

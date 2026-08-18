@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -164,6 +164,52 @@ test("sendEmail sends through injected transport", async () => {
   assert.deepEqual(result.rejected, [])
   assert.equal(sent.length, 1)
   assert.equal(sent[0].mail.text, "Body")
+})
+
+test("sendEmail loads SMTP config from an env file when process env is missing", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "email-env-"))
+  const envFile = path.join(directory, ".env")
+
+  try {
+    await writeFile(
+      envFile,
+      [
+        "SMTP_HOST=smtp.gmail.com",
+        "SMTP_PORT=587",
+        "SMTP_USER=sender@gmail.com",
+        "SMTP_PASS=app-password",
+        "SMTP_FROM=sender@gmail.com",
+        "",
+      ].join("\n"),
+    )
+
+    const sent = []
+    const result = await sendEmail(
+      {
+        to: "recipient@example.com",
+        subject: "Subject",
+        body: "Body",
+        attachments: [],
+        schedule: null,
+      },
+      {
+        env: {},
+        envFile,
+        createTransport: (config) => ({
+          async sendMail(mail) {
+            sent.push({ config, mail })
+            return { messageId: "message-123", accepted: ["recipient@example.com"], rejected: [] }
+          },
+        }),
+      },
+    )
+
+    assert.equal(result.messageId, "message-123")
+    assert.equal(sent[0].config.port, 587)
+    assert.equal(sent[0].config.auth.user, "sender@gmail.com")
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test("enqueueScheduledEmail persists an email job without the schedule field", async () => {

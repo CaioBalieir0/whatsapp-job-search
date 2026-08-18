@@ -9,16 +9,67 @@ description: Use when the user asks to search WhatsApp job postings, check recei
 
 Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly, filters recent messages, and writes `output/jobs-email.json`.
 
-Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API internals unless the CLI/output flow fails and the user explicitly asks to debug it.
+Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API internals. Manual Evolution API calls are allowed only for the normal pre-search connection check described below.
 
 ## Required Workflow
 
 1. Check containers with `docker compose ps`.
-2. If required services are not running, start them with `docker compose up -d` and wait until Evolution API is reachable on port `8080`.
-3. Determine the `hours` value before running the CLI.
-4. Run `npm run search -- <hours>`.
-5. Read and validate `output/jobs-email.json`.
-6. Report the last run, consulted hours, and total jobs found.
+2. If required services are not running, start them with `docker compose up -d` and wait until Evolution API is reachable.
+3. Verify the configured Evolution API instance is connected to WhatsApp.
+4. If the instance is disconnected, help the user generate the Evolution API QR Code, ask them to scan it in WhatsApp, and stop before searching.
+5. Determine the `hours` value before running the CLI.
+6. Run `npm run search -- <hours>`.
+7. Read and validate `output/jobs-email.json`.
+8. Report the last run, consulted hours, and total jobs found.
+
+## WhatsApp Connection Check
+
+Before choosing hours or running the CLI, confirm WhatsApp is connected through Evolution API.
+
+Load root `.env` values first. Required for this check:
+
+| Variable | Purpose |
+| --- | --- |
+| `EVOLUTION_API_URL` | Evolution API base URL, for example `http://localhost:8080`. |
+| `EVOLUTION_API_KEY` | API key used as the `apikey` header. |
+| `EVOLUTION_INSTANCE` | Evolution API instance name. |
+
+If any variable is missing, stop and tell the user exactly which variables are missing. Point them to `.env.example`.
+
+Check Evolution API reachability using the configured URL:
+
+```bash
+curl -fsS "$EVOLUTION_API_URL" >/dev/null
+```
+
+If it is not reachable, run `docker compose up -d`, then retry the reachability check. If it still fails, stop and report that Evolution API did not become reachable.
+
+Check whether the instance is connected:
+
+```bash
+curl -fsS -H "apikey: $EVOLUTION_API_KEY" "$EVOLUTION_API_URL/instance/connectionState/$EVOLUTION_INSTANCE"
+```
+
+Treat `open` as connected. If the response shows another state, no state, a missing instance, or a non-2xx status, do not run `npm run search` yet.
+
+If the instance is missing, create it with the configured instance name:
+
+```bash
+curl -fsS -X POST "$EVOLUTION_API_URL/instance/create" \
+  -H "Content-Type: application/json" \
+  -H "apikey: $EVOLUTION_API_KEY" \
+  -d "{\"instanceName\":\"$EVOLUTION_INSTANCE\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}"
+```
+
+Then request the QR Code:
+
+```bash
+curl -fsS -H "apikey: $EVOLUTION_API_KEY" "$EVOLUTION_API_URL/instance/connect/$EVOLUTION_INSTANCE"
+```
+
+Show the QR Code or QR Code data returned by Evolution API to the user. Tell them to open WhatsApp, go to linked devices, scan the QR Code, and rerun `/search-whatsapp-jobs <hours>` after the phone is connected. Stop after presenting the QR Code; do not continue to the search CLI in the same run.
+
+If QR Code generation fails, report the endpoint, HTTP status, and response body when available. Do not inspect databases, Docker volumes, or WhatsApp internals.
 
 ## Choosing Hours
 
@@ -75,6 +126,8 @@ Check whether Evolution API is reachable before running the CLI:
 ```bash
 curl -fsS http://localhost:8080/ >/dev/null
 ```
+
+Use `$EVOLUTION_API_URL` instead when it is configured.
 
 Run the search CLI:
 
@@ -140,7 +193,7 @@ Report empty results clearly: "The file was written, but no jobs were found for 
 ## Common Mistakes
 
 - Do not query Postgres, SQLite, databases, or Docker volumes to search messages.
-- Do not call Evolution API manually when the CLI is available.
+- Do not call Evolution API manually for message searching when the CLI is available. Manual Evolution API calls are allowed for the pre-search `connectionState` and `instance/connect` QR Code setup flow.
 - Do not invent a default when hours are missing; ask the user and show last run context.
 - Do not report success only from the CLI exit code; verify `output/jobs-email.json` afterward.
 - Do not use legacy output fields; the CLI writes `lastRun`, `hoursConsulted`, `total`, and `jobs`.
