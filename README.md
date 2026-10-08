@@ -15,9 +15,9 @@ This project is not a public job board scraper. It is a personal workflow for jo
 The local stack provides WhatsApp access through Evolution API, while repository code and Claude commands handle the job-search workflow:
 
 - Generate or refresh your job-search profile.
-- Search recent WhatsApp job posts through the local Node.js CLI.
+- Search recent WhatsApp job posts from configured WhatsApp source JIDs through the local Node.js CLI.
 - Filter jobs against your target roles, technologies, work mode, seniority, language, and rejection rules.
-- Build professional application emails from the filtered jobs.
+- Build professional application emails only for selected filtered jobs that contain an email address.
 - Send emails through a local MCP server only after the configured command flow validates them.
 
 ```text
@@ -25,9 +25,9 @@ WhatsApp job messages
   -> Evolution API
   -> local search CLI
   -> output/jobs-email.json
-  -> profile-based filtering
+  -> profile-based filtering with email eligibility
   -> output/filtered-jobs.json
-  -> email draft and send through MCP
+  -> user-selected email drafts and send through MCP
 ```
 
 ## Prerequisites
@@ -130,7 +130,7 @@ Under the hood, the command runs the local CLI:
 npm run search -- 24
 ```
 
-The CLI calls Evolution API directly for each configured source, filters recent messages that contain application contact text, and writes a combined `output/jobs-email.json`.
+The CLI calls Evolution API directly for each configured source JID, filters recent messages that contain application contact text, and writes a combined `output/jobs-email.json`.
 
 ### 6. Filter jobs against your profile
 
@@ -138,7 +138,9 @@ The CLI calls Evolution API directly for each configured source, filters recent 
 /filter-whatsapp-jobs
 ```
 
-This reads `profile/job-profile.md`, filters `output/jobs-email.json`, and writes compatible jobs to `output/filtered-jobs.json`. Every kept job starts with `send: false`.
+This reads `profile/job-profile.md`, filters `output/jobs-email.json`, and writes compatible jobs to `output/filtered-jobs.json`. Every kept job starts with `send: false` and has `hasEmail: true` or `hasEmail: false`, derived from whether the original message contains an email-like address.
+
+Filtering is binary. There is no ranking or score field; incompatible jobs are excluded, and compatible jobs are kept.
 
 You can run search and filter together with:
 
@@ -164,19 +166,27 @@ export SMTP_PASS=your-google-app-password
 export SMTP_FROM=your-email@gmail.com
 ```
 
-Restart your agent or MCP client after changing MCP or SMTP configuration. Then preview emails before sending:
+Restart your agent or MCP client after changing MCP or SMTP configuration. Then preview selected emails before sending:
 
 ```text
 /send-job-emails confirm
 ```
 
-Or send all eligible filtered jobs automatically after validation:
+If you do not pass indexes, `/send-job-emails` lists pending jobs with `hasEmail: true` and asks which ones to send. You can choose specific indexes or `todas`/`all`. Jobs without `hasEmail: true` are not sent.
+
+You can also pass explicit 1-based indexes:
+
+```text
+/send-job-emails confirm 1 3 5
+```
+
+Or automatically send the selected email-eligible jobs after validation:
 
 ```text
 /send-job-emails auto
 ```
 
-Successful sends are marked with `send: true` in `output/filtered-jobs.json`. Failed sends must stay pending.
+Successful sends are marked with `send: true` in `output/filtered-jobs.json`. Failed sends must stay pending. The command still validates the actual email address before sending, so `hasEmail: true` is only an eligibility marker, not a send guarantee.
 
 See [`mcp/README.md`](mcp/README.md) for SMTP setup, attachments, scheduled emails, and worker usage.
 
@@ -327,10 +337,10 @@ The project includes these local Claude commands:
 | --- | --- | --- |
 | `/setup` | `/setup` | Generate or refresh `profile/job-profile.md` and `profile/email-body-rules.md`. |
 | `/reset` | `/reset profile` | Reset profile files, documents, or both after explicit confirmation. |
-| `/search-whatsapp-jobs` | `/search-whatsapp-jobs 24` | Connect WhatsApp through Evolution API if needed, then search jobs through the local CLI. |
-| `/filter-whatsapp-jobs` | `/filter-whatsapp-jobs` | Filter raw jobs against the local profile. |
-| `/job-search-pipeline` | `/job-search-pipeline 24` | Run search and filtering in one flow. |
-| `/send-job-emails` | `/send-job-emails confirm` | Send application emails for filtered jobs through the email MCP. |
+| `/search-whatsapp-jobs` | `/search-whatsapp-jobs 24` | Connect WhatsApp through Evolution API if needed, then search configured source JIDs through the local CLI. |
+| `/filter-whatsapp-jobs` | `/filter-whatsapp-jobs` | Filter raw jobs against the local profile and mark `hasEmail`. |
+| `/job-search-pipeline` | `/job-search-pipeline 24` | Run search and filtering in one flow without sending emails. |
+| `/send-job-emails` | `/send-job-emails confirm` | Let the user choose email-eligible filtered jobs, then send through the email MCP. |
 
 ## Project Structure
 
@@ -361,7 +371,7 @@ The project includes these local Claude commands:
 |   `-- package.json               # MCP scripts and dependencies
 |-- output/
 |   |-- jobs-email.json            # Raw job-search output from the local CLI
-|   `-- filtered-jobs.json         # Profile-filtered jobs and send status
+|   `-- filtered-jobs.json         # Profile-filtered jobs, email eligibility, and send status
 `-- profile/
     |-- README.md                  # Profile usage and editing guide
     |-- job-profile.md             # Local source of truth for filtering

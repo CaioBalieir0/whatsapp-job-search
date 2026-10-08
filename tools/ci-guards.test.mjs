@@ -8,7 +8,7 @@ test('lintSkills accepts skills with headings and matching command references', 
   const result = lintSkills({
     skills: new Map([
       ['search-whatsapp-jobs', '# Search WhatsApp Jobs\n\nCheck connectionState, request QR Code with instance/connect, then search jobs.'],
-      ['filter-whatsapp-jobs', '# Filter WhatsApp Jobs\n\nUse when filtering jobs.'],
+      ['filter-whatsapp-jobs', '# Filter WhatsApp Jobs\n\nUse when filtering jobs. Add hasEmail for every kept job when text contains an email-like address and validate with job.hasEmail !== "boolean".'],
     ]),
     opencodeConfig: {
       command: {
@@ -55,6 +55,32 @@ test('lintSkills requires WhatsApp source onboarding guidance in setup skill', (
 
   assert.deepEqual(result.errors, [
     '.claude/skills/setup-job-profile/SKILL.md must guide WhatsApp QR Code login and profile/whatsapp-sources.json JID setup',
+  ]);
+});
+
+test('filter skill requires hasEmail in filtered job output', () => {
+  const result = lintSkills({
+    skills: new Map([
+      ['filter-whatsapp-jobs', '# Filter WhatsApp Jobs\n\nKeep matching jobs and set send: false.'],
+    ]),
+    opencodeConfig: { command: {} },
+  });
+
+  assert.deepEqual(result.errors, [
+    '.claude/skills/filter-whatsapp-jobs/SKILL.md must add and validate hasEmail on filtered jobs',
+  ]);
+});
+
+test('send skill requires email-eligible user selection before file-backed sending', () => {
+  const result = lintSkills({
+    skills: new Map([
+      ['send-job-emails', '# Send Job Emails\n\nSend pending filtered jobs.'],
+    ]),
+    opencodeConfig: { command: {} },
+  });
+
+  assert.deepEqual(result.errors, [
+    '.claude/skills/send-job-emails/SKILL.md must require user selection from pending jobs with hasEmail: true before file-backed sending',
   ]);
 });
 

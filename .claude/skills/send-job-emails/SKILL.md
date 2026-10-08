@@ -6,7 +6,7 @@ description: Use when the user asks to send job application emails for filtered 
 
 ## Overview
 
-Send professional job application emails for compatible jobs already filtered into `output/filtered-jobs.json`, selected by index from that file, or provided directly in the command. Use `profile/job-profile.md` for candidate details, `profile/email-body-rules.md` for email writing preferences, and the local email MCP tool to send email.
+Send professional job application emails for compatible jobs already filtered into `output/filtered-jobs.json`, selected by index from that file, selected interactively from email-eligible pending jobs, or provided directly in the command. Use `profile/job-profile.md` for candidate details, `profile/email-body-rules.md` for email writing preferences, and the local email MCP tool to send email.
 
 Do not search WhatsApp, run the WhatsApp search CLI, filter jobs, read `profile/documents/`, or modify `output/jobs-email.json`.
 
@@ -16,7 +16,7 @@ Do not search WhatsApp, run the WhatsApp search CLI, filter jobs, read `profile/
 2. Read `profile/job-profile.md`.
 3. Read `profile/email-body-rules.md`.
 4. If no direct job text was provided, read and validate `output/filtered-jobs.json`.
-5. Select jobs from the requested source, processing only file jobs where `send` is `false`.
+5. Select jobs from the requested source, processing only file jobs where `send` is `false` and `hasEmail` is `true`.
 6. For each selected job, analyze the selected job text for application email instructions.
 7. Build sendable drafts only when all required data is clear.
 8. In `confirm` mode, show the full batch of drafts and wait for approval before sending.
@@ -56,8 +56,8 @@ Supported target forms:
 
 | Target form | Example | Behavior |
 | --- | --- | --- |
-| Empty | `/send-job-emails confirm` | Read `output/filtered-jobs.json` and process every job where `send` is `false`. |
-| Numeric indexes | `/send-job-emails confirm 1 3 5` | Read `output/filtered-jobs.json` and process only those 1-based job indexes when their `send` value is `false`. |
+| Empty | `/send-job-emails confirm` | Read `output/filtered-jobs.json`, list pending jobs with `hasEmail: true`, and ask the user to choose indexes or `todas`/`all`. |
+| Numeric indexes | `/send-job-emails confirm 1 3 5` | Read `output/filtered-jobs.json` and process only those 1-based job indexes when their `send` value is `false` and `hasEmail` is `true`. |
 | Direct job text | `/send-job-emails confirm backend role... send resume to jobs@example.com` | Treat the remaining text as one or more temporary jobs provided directly by the user. |
 
 Rules:
@@ -65,6 +65,10 @@ Rules:
 - Treat targets as numeric indexes only when every remaining argument is a positive integer.
 - Indexes are 1-based and refer to the order of `jobs` in `output/filtered-jobs.json`.
 - If any index is out of range, skip it and report `invalid job index`.
+- If a selected file job has `hasEmail` other than `true`, skip it and report `missing email`.
+- If no indexes or direct job text are provided, show only file jobs where `send` is `false` and `hasEmail: true`, then ask the user to choose indexes or `todas`/`all` before building drafts.
+- If the user chooses `todas` or `all`, process every listed pending job with `hasEmail: true`.
+- If no pending jobs have `hasEmail: true`, stop and report that no email-eligible pending jobs are available.
 - If the remaining arguments contain non-numeric text, treat all remaining text as direct job text.
 - For direct job text, create temporary job objects with the provided text, `sender: "direct input"`, and `send: false`. A timestamp is not required for sending logic.
 - Do not read or validate `output/filtered-jobs.json` when processing only direct job text.
@@ -102,8 +106,9 @@ output/filtered-jobs.json
 - Every item in `jobs` must contain `text` as a string.
 - Every item in `jobs` must contain `timestamp` as a number.
 - Every item in `jobs` must contain `send` as a boolean.
+- Every item in `jobs` must contain `hasEmail` as a boolean.
 
-Only process file jobs where `send` is `false`. Ignore file jobs where `send` is `true`. Direct job text is always treated as pending because it is not stored in `output/filtered-jobs.json`.
+Only process file jobs where `send` is `false` and `hasEmail` is `true`. Ignore file jobs where `send` is `true`. Skip file jobs where `hasEmail` is `false`, even when their indexes are explicitly selected. Direct job text is always treated as pending because it is not stored in `output/filtered-jobs.json`.
 
 ## Profile Rules
 
@@ -243,6 +248,7 @@ Do not change:
 - `sender`
 - `text`
 - `timestamp`
+- `hasEmail`
 
 Do not add fields such as `reason`, `score`, `email`, `subject`, `body`, `sentAt`, or `messageId`.
 
@@ -253,7 +259,7 @@ Never modify `output/jobs-email.json`.
 Validate `output/filtered-jobs.json` before sending and after updates:
 
 ```bash
-node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JSON.parse(fs.readFileSync(p,"utf8")); if (typeof j.lastRun !== "string" || typeof j.hoursConsulted !== "number" || typeof j.sourceTotal !== "number" || typeof j.total !== "number" || !Array.isArray(j.jobs)) process.exit(1); if (j.total !== j.jobs.length) process.exit(1); if (j.jobs.some((job)=>typeof job.sender !== "string" || typeof job.text !== "string" || typeof job.timestamp !== "number" || typeof job.send !== "boolean" || Object.prototype.hasOwnProperty.call(job,"reason"))) process.exit(1); console.log(JSON.stringify({ sourceTotal: j.sourceTotal, total: j.total, pending: j.jobs.filter((job)=>job.send === false).length, sent: j.jobs.filter((job)=>job.send === true).length }, null, 2));'
+node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JSON.parse(fs.readFileSync(p,"utf8")); if (typeof j.lastRun !== "string" || typeof j.hoursConsulted !== "number" || typeof j.sourceTotal !== "number" || typeof j.total !== "number" || !Array.isArray(j.jobs)) process.exit(1); if (j.total !== j.jobs.length) process.exit(1); if (j.jobs.some((job)=>typeof job.sender !== "string" || typeof job.text !== "string" || typeof job.timestamp !== "number" || typeof job.send !== "boolean" || typeof job.hasEmail !== "boolean" || Object.prototype.hasOwnProperty.call(job,"reason"))) process.exit(1); console.log(JSON.stringify({ sourceTotal: j.sourceTotal, total: j.total, pending: j.jobs.filter((job)=>job.send === false).length, emailEligiblePending: j.jobs.filter((job)=>job.send === false && job.hasEmail === true).length, sent: j.jobs.filter((job)=>job.send === true).length }, null, 2));'
 ```
 
 If validation fails before sending, stop and report that `output/filtered-jobs.json` is invalid. Do not try to repair unrelated structure unless the user asks.
@@ -285,11 +291,22 @@ Skipped:
 
 Ask for explicit approval before sending. If the user does not approve, do not send and do not mark any job as sent.
 
+When no indexes were provided, ask the user to choose from pending jobs with `hasEmail: true` before generating the draft batch:
+
+```markdown
+Choose jobs to email:
+
+1. Job 1 - Job Channel - Backend Developer
+3. Job 3 - Recruiter - QA Engineer
+
+Reply with indexes such as `1 3`, or `todas`/`all` to select every listed job.
+```
+
 ## Reporting
 
 At the end, report:
 
-- `eligible`: number of jobs initially found with `send: false`.
+- `eligible`: number of jobs initially found with `send: false` and `hasEmail: true`.
 - `skipped`: number skipped before sending.
 - `sent`: number successfully sent.
 - `failed`: number that failed during MCP send.
@@ -312,7 +329,9 @@ Use short skipped reasons:
 | Situation | Action |
 | --- | --- |
 | `send` is `true` on a file job | Ignore the job |
-| `send` is `false` and email is clear | Build a draft |
+| `send` is `false`, `hasEmail: true`, and email is clear | Build a draft |
+| `send` is `false` and `hasEmail` is `false` | Skip the job |
+| No file indexes are provided | Ask the user to choose pending jobs with `hasEmail: true` |
 | Direct job text is provided | Build drafts from the text and do not update `output/filtered-jobs.json` |
 | `profile/email-body-rules.md` is missing or incomplete | Skip sending and ask the user to run `/setup` or edit the file |
 | Job specifies subject | Use the exact subject |
@@ -328,6 +347,7 @@ Use short skipped reasons:
 - Do not embed a hard-coded email body template when `profile/email-body-rules.md` provides the user's preferences.
 - Do not send jobs outside `output/filtered-jobs.json` unless they were provided directly in `$ARGUMENTS`.
 - Do not send jobs already marked with `send: true`.
+- Do not send file jobs unless `hasEmail` is `true`.
 - Do not modify `output/jobs-email.json`.
 - Do not invent missing candidate facts.
 - Do not invent or correct email addresses.
