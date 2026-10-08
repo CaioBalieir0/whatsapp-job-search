@@ -7,7 +7,7 @@ description: Use when the user asks to search WhatsApp job postings, check recei
 
 ## Overview
 
-Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly, filters recent messages, and writes `output/jobs-email.json`.
+Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly for each configured source, filters recent messages, and writes `output/jobs-email.json`.
 
 Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API internals. Manual Evolution API calls are allowed only for the normal pre-search connection check described below.
 
@@ -17,10 +17,11 @@ Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API in
 2. If required services are not running, start them with `docker compose up -d` and wait until Evolution API is reachable.
 3. Verify the configured Evolution API instance is connected to WhatsApp.
 4. If the instance is disconnected, help the user generate the Evolution API QR Code, ask them to scan it in WhatsApp, and stop before searching.
-5. Determine the `hours` value before running the CLI.
-6. Run `npm run search -- <hours>`.
-7. Read and validate `output/jobs-email.json`.
-8. Report the last run, consulted hours, and total jobs found.
+5. Confirm sources are configured in `profile/whatsapp-sources.json`.
+6. Determine the `hours` value before running the CLI.
+7. Run `npm run search -- <hours>`.
+8. Read and validate `output/jobs-email.json`.
+9. Report the last run, consulted hours, and total jobs found.
 
 ## WhatsApp Connection Check
 
@@ -97,13 +98,23 @@ The CLI loads root `.env` automatically. Required variables:
 | `EVOLUTION_API_URL` | Evolution API base URL, for example `http://localhost:8080`. |
 | `EVOLUTION_API_KEY` | API key used as the `apikey` header. |
 | `EVOLUTION_INSTANCE` | Evolution API instance name. |
-| `WHATSAPP_GROUP_JID` | WhatsApp group JID to search. |
 
 Optional variable:
 
 | Variable | Purpose |
 | --- | --- |
 | `JOBS_OUTPUT_FILE` | Output path. Defaults to `output/jobs-email.json`. |
+
+Preferred source configuration lives in `profile/whatsapp-sources.json`:
+
+```json
+{
+  "sources": [
+    { "name": "Tech Jobs Group", "jid": "replace-with-group-jid@g.us" },
+    { "name": "Recruiter John", "jid": "replace-with-contact-jid@s.whatsapp.net" }
+  ]
+}
+```
 
 Use `.env.example` as the reference for safe placeholder values.
 
@@ -157,6 +168,7 @@ After the CLI runs, verify all of these before reporting success:
 - Every item in `jobs` contains `sender` as a string.
 - Every item in `jobs` contains `text` as a string.
 - Every item in `jobs` contains `timestamp` as a number.
+- If present, `source.name` and `source.jid` are strings.
 
 If any check fails, say the CLI did not produce the expected output and ask whether the user wants to debug the local search flow.
 
@@ -177,6 +189,7 @@ Expected output fields:
 | Job sender | `jobs[].sender` |
 | Job text | `jobs[].text` |
 | Job timestamp | `jobs[].timestamp` |
+| Job source | `jobs[].source` |
 
 Report empty results clearly: "The file was written, but no jobs were found for the consulted time window."
 

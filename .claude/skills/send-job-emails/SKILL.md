@@ -58,7 +58,7 @@ Supported target forms:
 | --- | --- | --- |
 | Empty | `/send-job-emails confirm` | Read `output/filtered-jobs.json` and process every job where `send` is `false`. |
 | Numeric indexes | `/send-job-emails confirm 1 3 5` | Read `output/filtered-jobs.json` and process only those 1-based job indexes when their `send` value is `false`. |
-| Direct job text | `/send-job-emails confirm vaga backend... enviar CV para jobs@example.com` | Treat the remaining text as one or more temporary jobs provided directly by the user. |
+| Direct job text | `/send-job-emails confirm backend role... send resume to jobs@example.com` | Treat the remaining text as one or more temporary jobs provided directly by the user. |
 
 Rules:
 
@@ -131,16 +131,12 @@ Extract email addresses only from the selected job text.
 
 Send only when the email appears related to job applications. Prefer email addresses near words such as:
 
-- `curriculo`
-- `currículo`
 - `cv`
-- `vaga`
-- `candidatura`
 - `resume`
 - `apply`
-- `recrutamento`
 - `recruiter`
-- `talentos`
+- `recruiting`
+- `talent`
 
 Skip the job when:
 
@@ -161,23 +157,20 @@ Required behavior:
 - If the job specifies body content, include that content and do not contradict it.
 - If the job asks for salary expectation, availability, location, language level, or another fact not present in `profile/job-profile.md`, skip the job.
 - If no subject is specified, create a professional subject from the role when the role can be identified.
-- If no role can be identified, use `Candidatura para vaga`.
+- If no role can be identified, use `Job application`.
 
 Common subject instruction patterns include:
 
-- `assunto:`
 - `subject:`
-- `enviar com o assunto`
-- `colocar no assunto`
-- `título do email`
+- `send with subject`
+- `use the subject`
+- `email subject`
 
 Common attachment instruction patterns include:
 
-- `enviar currículo`
-- `enviar curriculo`
 - `send resume`
-- `anexar CV`
-- `com currículo em anexo`
+- `attach CV`
+- `resume attached`
 
 ## Email Body Rules
 
@@ -273,13 +266,13 @@ Before sending in `confirm` mode, show:
 ## Email Drafts
 
 1. Recipient: candidate@example.com
-   Subject: Candidatura para vaga de Backend Developer
+   Subject: Application for Backend Developer
    Attachments: [profile/documents/cv.pdf]
    Body:
    ```text
-   Prezados,
+   Dear hiring team,
 
-   Gostaria de me candidatar à vaga de Backend Developer.
+   I would like to apply for the Backend Developer position.
    ...
 ```
 

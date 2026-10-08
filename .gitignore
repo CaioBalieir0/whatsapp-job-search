@@ -3,6 +3,7 @@ output/*.json
 profile/documents/**
 !profile/documents/
 !profile/documents/README.md
+profile/whatsapp-sources.json
 mcp/scheduled-emails.json
 node_modules
 .opencode/

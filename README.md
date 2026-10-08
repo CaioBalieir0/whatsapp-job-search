@@ -116,13 +116,21 @@ Run the search command with a time window in hours:
 
 Before searching, `/search-whatsapp-jobs` checks Docker, Evolution API, and the configured WhatsApp instance. If the instance is not connected, the command requests an Evolution API QR Code and asks you to scan it from WhatsApp's linked devices screen. After scanning, rerun `/search-whatsapp-jobs 24`.
 
+Configure the groups or direct conversations to search in `profile/whatsapp-sources.json`. Start from the safe example:
+
+```bash
+cp profile/whatsapp-sources.example.json profile/whatsapp-sources.json
+```
+
+Each source needs a WhatsApp `jid`; `name` is optional and is included in search results for traceability.
+
 Under the hood, the command runs the local CLI:
 
 ```bash
 npm run search -- 24
 ```
 
-The CLI calls Evolution API directly, filters recent messages that contain application contact text, and writes `output/jobs-email.json`.
+The CLI calls Evolution API directly for each configured source, filters recent messages that contain application contact text, and writes a combined `output/jobs-email.json`.
 
 ### 6. Filter jobs against your profile
 
@@ -211,8 +219,9 @@ cp .env.example .env
 | `EVOLUTION_API_KEY` | Yes | API key used by Evolution API and the search CLI. |
 | `EVOLUTION_INSTANCE` | Yes | Evolution API instance name connected to WhatsApp. |
 | `EVOLUTION_API_PORT` | Docker | Published Evolution API port. Defaults to `8080`. |
-| `WHATSAPP_GROUP_JID` | Yes | WhatsApp group JID to search. |
 | `JOBS_OUTPUT_FILE` | No | Output path for raw search results. Defaults to `output/jobs-email.json`. |
+
+WhatsApp groups and direct conversations are configured in `profile/whatsapp-sources.json`, not in `.env`. Copy `profile/whatsapp-sources.example.json` to that path and fill in the JIDs you want to search.
 
 ### Docker Services
 
@@ -338,6 +347,8 @@ The project includes these local Claude commands:
 |-- package.json                   # Root search CLI scripts and tests
 |-- opencode.json                  # OpenCode compatibility config pointing at .claude/skills
 |-- README.md                      # Project overview and quick start
+|-- profile/
+|   `-- whatsapp-sources.example.json # Safe example for WhatsApp source configuration
 |-- scripts/
 |   |-- search-whatsapp-jobs.mjs   # Local WhatsApp search CLI
 |   `-- search-whatsapp-jobs.test.mjs

@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const DEFAULT_HOURS = 24;
 const DEFAULT_OUTPUT_FILE = 'output/jobs-email.json';
-const REQUIRED_ENV = ['EVOLUTION_API_URL', 'EVOLUTION_API_KEY', 'EVOLUTION_INSTANCE', 'WHATSAPP_GROUP_JID'];
+const DEFAULT_SOURCES_FILE = 'profile/whatsapp-sources.json';
+const REQUIRED_ENV = ['EVOLUTION_API_URL', 'EVOLUTION_API_KEY', 'EVOLUTION_INSTANCE'];
 
 export function getHours(args) {
   const value = Number(args[0]);
@@ -52,9 +53,40 @@ export function validateConfig(env) {
     apiUrl: env.EVOLUTION_API_URL.replace(/\/+$/, ''),
     apiKey: env.EVOLUTION_API_KEY,
     instance: env.EVOLUTION_INSTANCE,
-    groupJid: env.WHATSAPP_GROUP_JID,
     outputFile: env.JOBS_OUTPUT_FILE || DEFAULT_OUTPUT_FILE,
+    sourcesFile: DEFAULT_SOURCES_FILE,
   };
+}
+
+export async function loadSources(config) {
+  let raw;
+  try {
+    raw = await readFile(config.sourcesFile, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    throw new Error(`WhatsApp sources file not found. Create ${config.sourcesFile}.`);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid WhatsApp sources file ${config.sourcesFile}: ${error.message}`);
+  }
+
+  const sources = Array.isArray(parsed?.sources) ? parsed.sources : [];
+  const validSources = sources
+    .filter((source) => typeof source?.jid === 'string' && source.jid.trim())
+    .map((source) => ({
+      name: typeof source.name === 'string' && source.name.trim() ? source.name.trim() : source.jid.trim(),
+      jid: source.jid.trim(),
+    }));
+
+  if (validSources.length === 0) {
+    throw new Error(`No valid WhatsApp sources found in ${config.sourcesFile}. Add at least one source with a jid.`);
+  }
+
+  return validSources;
 }
 
 export function normalizeMessages(raw) {
@@ -64,7 +96,7 @@ export function normalizeMessages(raw) {
   return [];
 }
 
-export function filterJobMessages(messages, hours, nowSeconds = Math.floor(Date.now() / 1000)) {
+export function filterJobMessages(messages, hours, nowSeconds = Math.floor(Date.now() / 1000), source) {
   const startWindow = nowSeconds - hours * 60 * 60;
   const results = [];
 
@@ -76,11 +108,15 @@ export function filterJobMessages(messages, hours, nowSeconds = Math.floor(Date.
     if (!Number.isFinite(timestamp) || timestamp < startWindow) continue;
     if (!text.includes('@')) continue;
 
-    results.push({
+    const job = {
       sender: message.pushName || '',
       text,
       timestamp,
-    });
+    };
+
+    if (source) job.source = source;
+
+    results.push(job);
   }
 
   return results;
@@ -100,7 +136,7 @@ export async function writeOutputFile(filePath, content) {
   await writeFile(filePath, content);
 }
 
-export async function fetchMessages(config, fetchImpl = fetch) {
+export async function fetchMessages(config, source, fetchImpl = fetch) {
   const response = await fetchImpl(`${config.apiUrl}/chat/findMessages/${config.instance}`, {
     method: 'POST',
     headers: {
@@ -110,7 +146,7 @@ export async function fetchMessages(config, fetchImpl = fetch) {
     body: JSON.stringify({
       where: {
         key: {
-          remoteJid: config.groupJid,
+          remoteJid: source.jid,
         },
       },
     }),
@@ -124,14 +160,28 @@ export async function fetchMessages(config, fetchImpl = fetch) {
   return body ? JSON.parse(body) : {};
 }
 
+export async function fetchMessagesForSources(config, sources, fetchImpl = fetch) {
+  const results = [];
+
+  for (const source of sources) {
+    const raw = await fetchMessages(config, source, fetchImpl);
+    results.push({ source, raw });
+  }
+
+  return results;
+}
+
 export async function run(args = process.argv.slice(2), env = process.env) {
   await loadEnvFile('.env', env);
 
   const hours = getHours(args);
   const config = validateConfig(env);
-  const raw = await fetchMessages(config);
-  const messages = normalizeMessages(raw);
-  const jobs = filterJobMessages(messages, hours);
+  const sources = await loadSources(config);
+  const sourceResults = await fetchMessagesForSources(config, sources);
+  const jobs = sourceResults.flatMap(({ source, raw }) => {
+    const messages = normalizeMessages(raw);
+    return filterJobMessages(messages, hours, Math.floor(Date.now() / 1000), source);
+  });
   const output = buildOutput(jobs, hours);
 
   await writeOutputFile(config.outputFile, `${JSON.stringify(output, null, 2)}\n`);
