@@ -45,6 +45,19 @@ test('lintSkills requires WhatsApp connection guidance in search skill', () => {
   ]);
 });
 
+test('lintSkills requires WhatsApp source onboarding guidance in setup skill', () => {
+  const result = lintSkills({
+    skills: new Map([
+      ['setup-job-profile', '# Setup Job Profile\n\nGenerate profile files.'],
+    ]),
+    opencodeConfig: { command: {} },
+  });
+
+  assert.deepEqual(result.errors, [
+    '.claude/skills/setup-job-profile/SKILL.md must guide WhatsApp QR Code login and profile/whatsapp-sources.json JID setup',
+  ]);
+});
+
 test('lintSkills rejects missing titles and unknown command skill references', () => {
   const result = lintSkills({
     skills: new Map([

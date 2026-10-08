@@ -7,9 +7,9 @@ description: Use when the user runs /setup, asks to generate profile/job-profile
 
 ## Overview
 
-Run onboarding for this WhatsApp job search workspace. Collect the user's professional information and generate or refresh `profile/job-profile.md` so `/filter-whatsapp-jobs` can evaluate jobs from `output/jobs-email.json`. Also generate or refresh `profile/email-body-rules.md` so `/send-job-emails` can write email bodies using user-editable language, tone, and structure preferences.
+Run onboarding for this WhatsApp job search workspace. Collect the user's professional information and generate or refresh `profile/job-profile.md` so `/filter-whatsapp-jobs` can evaluate jobs from `output/jobs-email.json`. Also generate or refresh `profile/email-body-rules.md` so `/send-job-emails` can write email bodies using user-editable language, tone, and structure preferences. Optionally help the user connect WhatsApp and configure source JIDs in `profile/whatsapp-sources.json`.
 
-This skill is for profile setup only. Do not filter jobs, do not send emails, do not run the WhatsApp search CLI, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
+This skill is for setup only. Do not filter jobs, do not send emails, do not run the WhatsApp search CLI, and do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 
 ## Core Contract
 
@@ -19,9 +19,12 @@ This skill is for profile setup only. Do not filter jobs, do not send emails, do
 - Attachment paths are optional. Ask the user whether to configure CV, resume, portfolio, or other attachment paths; paths may be under `profile/documents/` or any local path the user provides.
 - The generated filtering profile is `profile/job-profile.md`.
 - The generated email body preferences file is `profile/email-body-rules.md`.
+- The generated WhatsApp source configuration is `profile/whatsapp-sources.json`.
 - `/filter-whatsapp-jobs` reads only `profile/job-profile.md`; it must not read `profile/documents/`.
 - `/send-job-emails` reads `profile/job-profile.md` for candidate facts and `profile/email-body-rules.md` for email language, tone, and body structure preferences; it must not read `profile/documents/`.
 - Before writing `profile/job-profile.md` or `profile/email-body-rules.md`, present the proposed complete file content and wait for explicit confirmation.
+- Before writing `profile/whatsapp-sources.json`, present the proposed complete JSON content and wait for explicit confirmation.
+- WhatsApp source setup may use Evolution API only for setup checks, QR Code login, and listing chats to identify JIDs. Do not inspect databases, Docker volumes, WhatsApp internals, or generated output files.
 - Prefer a clear, specific profile over a broad profile. Weak or ambiguous future matches should be excluded by the filter.
 
 ## Step 0: Welcome And Choose Path
@@ -41,7 +44,11 @@ Accepted section names:
 - `rules`
 - `email`
 - `email-body`
+- `whatsapp`
+- `sources`
 - `all`
+
+If `$ARGUMENTS` contains `--section whatsapp` or `--section sources`, skip profile questions and run only [WhatsApp Source Setup](#whatsapp-source-setup).
 
 If no `--section` argument is provided, scan `profile/documents/**/*` with Glob before greeting the user.
 
@@ -52,7 +59,7 @@ If `profile/documents/` has files, lead with Path A:
 ```markdown
 ## Welcome To Job Profile Setup
 
-I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences.
+I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences. I can also help connect WhatsApp and configure `profile/whatsapp-sources.json` after the profile files are ready.
 
 I found files in `profile/documents/`: [list file paths]. Three ways to start:
 
@@ -70,7 +77,7 @@ If `profile/documents/` is empty or missing, surface Path A as optional:
 ```markdown
 ## Welcome To Job Profile Setup
 
-I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences.
+I'll help you build `profile/job-profile.md` for filtering and `profile/email-body-rules.md` for application email writing preferences. I can also help connect WhatsApp and configure `profile/whatsapp-sources.json` after the profile files are ready.
 
 Three ways to start:
 
@@ -84,6 +91,120 @@ Which would you like?
 ```
 
 Wait for the user's choice. If they pick Path A but `profile/documents/` is still empty, tell them they can add any relevant materials directly under `profile/documents/` and stop.
+
+## WhatsApp Source Setup
+
+Use this workflow when the user runs `/setup --section whatsapp`, `/setup --section sources`, or when they accept the optional WhatsApp source setup offer after profile setup.
+
+This workflow helps the user log in to WhatsApp through Evolution API and fill `profile/whatsapp-sources.json` with the group or direct-chat JIDs that `/search-whatsapp-jobs` will search.
+
+### Step W1: Check Required Environment
+
+Read root `.env` values. Required variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `EVOLUTION_API_URL` | Evolution API base URL, for example `http://localhost:8080`. |
+| `EVOLUTION_API_KEY` | API key used as the `apikey` header. |
+| `EVOLUTION_INSTANCE` | Evolution API instance name. |
+
+If any variable is missing, stop and tell the user exactly which variables are missing. Point them to `.env.example`. Do not guess values.
+
+### Step W2: Start And Check Evolution API
+
+Check containers with:
+
+```bash
+docker compose ps
+```
+
+If required services are not running, start them with:
+
+```bash
+docker compose up -d
+```
+
+Then verify Evolution API is reachable:
+
+```bash
+curl -fsS "$EVOLUTION_API_URL" >/dev/null
+```
+
+If Evolution API is still unreachable, stop and report that setup cannot continue until the service is reachable.
+
+### Step W3: Connect WhatsApp By QR Code When Needed
+
+Check whether the configured instance is connected:
+
+```bash
+curl -fsS -H "apikey: $EVOLUTION_API_KEY" "$EVOLUTION_API_URL/instance/connectionState/$EVOLUTION_INSTANCE"
+```
+
+Treat `open` as connected. If the instance is missing, create it:
+
+```bash
+curl -fsS -X POST "$EVOLUTION_API_URL/instance/create" \
+  -H "Content-Type: application/json" \
+  -H "apikey: $EVOLUTION_API_KEY" \
+  -d "{\"instanceName\":\"$EVOLUTION_INSTANCE\",\"qrcode\":true,\"integration\":\"WHATSAPP-BAILEYS\"}"
+```
+
+If the instance is disconnected, request the QR Code:
+
+```bash
+curl -fsS -H "apikey: $EVOLUTION_API_KEY" "$EVOLUTION_API_URL/instance/connect/$EVOLUTION_INSTANCE"
+```
+
+Show the QR Code or QR Code data returned by Evolution API to the user. Tell them to open WhatsApp, go to linked devices, scan the QR Code, and rerun `/setup --section whatsapp` after the phone is connected. Stop after presenting the QR Code; do not continue to source JID setup in the same run.
+
+### Step W4: Discover Source JIDs
+
+After the instance is connected, help the user identify JIDs for groups and direct conversations.
+
+First, try to list chats through Evolution API:
+
+```bash
+curl -fsS -X POST "$EVOLUTION_API_URL/chat/findChats/$EVOLUTION_INSTANCE" \
+  -H "Content-Type: application/json" \
+  -H "apikey: $EVOLUTION_API_KEY" \
+  -d '{}'
+```
+
+From the response, extract likely source candidates. Group JIDs usually end with `@g.us`; direct conversation JIDs usually end with `@s.whatsapp.net`. Use readable fields such as `name`, `pushName`, `subject`, `remoteJid`, `id`, or `jid` when present.
+
+If the chat listing endpoint fails or returns no useful JIDs, do not inspect databases, Docker volumes, or WhatsApp internals. Ask the user to paste the desired JIDs from their Evolution API dashboard, logs, or another safe source.
+
+### Step W5: Propose Source File
+
+Read `profile/whatsapp-sources.json` if it exists. Preserve existing valid sources unless the user asks to replace them.
+
+Ask the user which discovered or pasted sources should be searched. Then present the complete proposed file:
+
+````markdown
+## Proposed `profile/whatsapp-sources.json`
+
+```json
+{
+  "sources": [
+    { "name": "Tech Jobs Group", "jid": "123456789@g.us" },
+    { "name": "Recruiter John", "jid": "5511999999999@s.whatsapp.net" }
+  ]
+}
+```
+
+Write this WhatsApp source configuration? Reply `yes` to write it, or tell me what to change.
+````
+
+Wait for explicit confirmation before writing `profile/whatsapp-sources.json`.
+
+### Step W6: Write Confirmed Sources
+
+After confirmation, write `profile/whatsapp-sources.json` with the confirmed JSON. Report:
+
+- The file updated: `profile/whatsapp-sources.json`.
+- The number of configured sources.
+- That this file is ignored by Git.
+- Suggested next step: run `/search-whatsapp-jobs 24`.
 
 ## Path A: Documents Folder
 
@@ -486,10 +607,11 @@ After writing, present a concise summary:
 ```markdown
 ## Setup Complete
 
-Generated or updated:
+Generated or updated as requested:
 
 - `profile/job-profile.md` - normalized profile used by `/filter-whatsapp-jobs`
 - `profile/email-body-rules.md` - email body preferences used by `/send-job-emails`
+- `profile/whatsapp-sources.json` - WhatsApp source JIDs used by `/search-whatsapp-jobs`, when source setup was requested
 
 Filtering and sending behavior:
 
@@ -502,6 +624,7 @@ Next steps:
 
 - Run `/search-whatsapp-jobs 24` to collect recent jobs
 - Run `/filter-whatsapp-jobs` to filter them against your profile
+- Run `/setup --section whatsapp` later to connect WhatsApp or update source JIDs
 - Run `/setup --section roles` later to update a specific section
 - Run `/setup --section email-body` later to update email writing preferences
 ```
@@ -509,6 +632,7 @@ Next steps:
 ## Common Mistakes
 
 - Do not write `profile/job-profile.md` or `profile/email-body-rules.md` before the user confirms the proposed content.
+- Do not write `profile/whatsapp-sources.json` before the user confirms the proposed JSON.
 - Do not filter jobs or send emails during setup.
 - Do not modify `output/jobs-email.json` or `output/filtered-jobs.json`.
 - Do not require subfolders inside `profile/documents/`.
@@ -520,7 +644,8 @@ Next steps:
 
 ## Design Principles
 
-- Three onboarding paths converge on two normalized files: `profile/job-profile.md` and `profile/email-body-rules.md`.
+- Three profile onboarding paths converge on two normalized files: `profile/job-profile.md` and `profile/email-body-rules.md`.
+- WhatsApp source setup is a separate setup section that writes `profile/whatsapp-sources.json` only after confirmation.
 - Path A is read-before-write and safe to re-run as documents change.
 - Path B supports one pasted or mentioned source when the user does not want to organize files.
 - Path C is conversational and can update one section at a time.

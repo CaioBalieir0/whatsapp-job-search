@@ -17,6 +17,10 @@ export function lintSkills({ skills, opencodeConfig }) {
     if (skillName === 'search-whatsapp-jobs' && !hasWhatsAppConnectionGuidance(content)) {
       errors.push('.claude/skills/search-whatsapp-jobs/SKILL.md must verify WhatsApp connection and QR Code setup before searching');
     }
+
+    if (skillName === 'setup-job-profile' && !hasWhatsAppSourceSetupGuidance(content)) {
+      errors.push('.claude/skills/setup-job-profile/SKILL.md must guide WhatsApp QR Code login and profile/whatsapp-sources.json JID setup');
+    }
   }
 
   for (const [commandName, command] of Object.entries(opencodeConfig.command ?? {})) {
@@ -40,6 +44,10 @@ function hasMarkdownTitle(content) {
 
 function hasWhatsAppConnectionGuidance(content) {
   return /connectionState/.test(content) && /QR Code/.test(content) && /instance\/connect/.test(content);
+}
+
+function hasWhatsAppSourceSetupGuidance(content) {
+  return /QR Code/.test(content) && /profile\/whatsapp-sources\.json/.test(content) && /\bJID\b|\bjid\b/.test(content);
 }
 
 function loadRepositoryInputs(rootDir) {
