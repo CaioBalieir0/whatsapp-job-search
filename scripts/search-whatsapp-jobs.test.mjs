@@ -87,7 +87,7 @@ test('normalizeMessages supports known Evolution API response shapes', () => {
   assert.deepEqual(normalizeMessages({}), []);
 });
 
-test('filterJobMessages keeps only recent messages with email-like content', () => {
+test('filterJobMessages keeps all recent text messages', () => {
   const now = 10_000;
   const messages = [
     {
@@ -115,6 +115,7 @@ test('filterJobMessages keeps only recent messages with email-like content', () 
   assert.deepEqual(filterJobMessages(messages, 1, now), [
     { sender: 'Recent Sender', text: 'Send CV to hiring@example.com', timestamp: 9_990 },
     { sender: 'Extended Sender', text: 'Apply at jobs@example.com', timestamp: 9_980 },
+    { sender: 'No Email Sender', text: 'No contact address here', timestamp: 9_995 },
   ]);
 });
 

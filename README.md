@@ -130,7 +130,7 @@ Under the hood, the command runs the local CLI:
 npm run search -- 24
 ```
 
-The CLI calls Evolution API directly for each configured source JID, filters recent messages that contain application contact text, and writes a combined `output/jobs-email.json`.
+The CLI calls Evolution API directly for each configured source JID, keeps recent text messages, and writes a combined `output/jobs-email.json`. Profile matching and email detection happen in `/filter-whatsapp-jobs`.
 
 ### 6. Filter jobs against your profile
 

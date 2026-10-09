@@ -7,7 +7,7 @@ description: Use when the user asks to search WhatsApp job postings, check recei
 
 ## Overview
 
-Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly for each source JID configured in `profile/whatsapp-sources.json`, filters recent messages, and writes `output/jobs-email.json`.
+Use the local CLI to collect recent text messages received through WhatsApp. The CLI calls Evolution API directly for each source JID configured in `profile/whatsapp-sources.json`, keeps recent messages with text, and writes `output/jobs-email.json`. Profile matching and email detection happen later in `/filter-whatsapp-jobs`.
 
 Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API internals. Manual Evolution API calls are allowed only for the normal pre-search connection check described below.
 

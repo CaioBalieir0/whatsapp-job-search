@@ -106,7 +106,6 @@ export function filterJobMessages(messages, hours, nowSeconds = Math.floor(Date.
 
     const timestamp = Number(message.messageTimestamp);
     if (!Number.isFinite(timestamp) || timestamp < startWindow) continue;
-    if (!text.includes('@')) continue;
 
     const job = {
       sender: message.pushName || '',
