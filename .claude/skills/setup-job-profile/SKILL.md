@@ -161,6 +161,8 @@ Show the QR Code or QR Code data returned by Evolution API to the user. Tell the
 
 After the instance is connected, help the user identify JIDs for groups and direct conversations.
 
+Ask the user for the group or direct-chat name they want to configure if they have not already provided it. Use that name as the primary search term when inspecting the chat listing response. Do not ask the user to know the JID upfront.
+
 First, try to list chats through Evolution API:
 
 ```bash
@@ -171,6 +173,17 @@ curl -fsS -X POST "$EVOLUTION_API_URL/chat/findChats/$EVOLUTION_INSTANCE" \
 ```
 
 From the response, extract likely source candidates. Group JIDs usually end with `@g.us`; direct conversation JIDs usually end with `@s.whatsapp.net`. Use readable fields such as `name`, `pushName`, `subject`, `remoteJid`, `id`, or `jid` when present.
+
+To find a JID from a group or chat name:
+
+1. Normalize the user-provided name and candidate titles with lowercase comparison and whitespace trimming.
+2. Look for exact or partial matches in `subject`, `name`, `pushName`, `profileName`, `verifiedName`, and any other readable title-like fields returned by Evolution API.
+3. Extract the JID from `remoteJid`, `id`, `jid`, `key.remoteJid`, or another clearly named JID field.
+4. Prefer candidates whose JID ends with `@g.us` when the user asked for a group.
+5. Present up to 10 likely candidates with display name, JID, and whether it looks like a group or direct chat.
+6. Ask the user to choose the correct candidate before adding it to `profile/whatsapp-sources.json`.
+
+If there is exactly one strong match, still ask for confirmation before writing. If there are multiple close matches, do not guess. If there are no matches, ask the user to check the group name spelling, send a recent message in that group so it appears in the chat list, rerun `/setup --section whatsapp`, or paste the JID from a safe Evolution API dashboard/source.
 
 If the chat listing endpoint fails or returns no useful JIDs, do not inspect databases, Docker volumes, or WhatsApp internals. Ask the user to paste the desired JIDs from their Evolution API dashboard, logs, or another safe source.
 
