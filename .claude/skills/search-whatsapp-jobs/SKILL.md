@@ -7,7 +7,7 @@ description: Use when the user asks to search WhatsApp job postings, check recei
 
 ## Overview
 
-Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly for each source JID configured in `profile/whatsapp-sources.json`, filters recent messages, and writes `output/jobs-email.json`.
+Use the local CLI to search job messages received through WhatsApp. The CLI calls Evolution API directly for each configured source, filters recent messages, and writes `output/jobs-email.json`.
 
 Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API internals. Manual Evolution API calls are allowed only for the normal pre-search connection check described below.
 
@@ -17,7 +17,7 @@ Do not inspect databases, WhatsApp directly, Docker volumes, or Evolution API in
 2. If required services are not running, start them with `docker compose up -d` and wait until Evolution API is reachable.
 3. Verify the configured Evolution API instance is connected to WhatsApp.
 4. If the instance is disconnected, help the user generate the Evolution API QR Code, ask them to scan it in WhatsApp, and stop before searching.
-5. Confirm source JIDs are configured in `profile/whatsapp-sources.json`.
+5. Confirm sources are configured in `profile/whatsapp-sources.json`.
 6. Determine the `hours` value before running the CLI.
 7. Run `npm run search -- <hours>`.
 8. Read and validate `output/jobs-email.json`.

@@ -7,7 +7,7 @@ description: Use when the user asks to filter WhatsApp job postings, match outpu
 
 ## Overview
 
-Filter the raw WhatsApp job postings using the user's local job profile. Keep only jobs that match the profile, and always write `send: false` and `hasEmail: true | false` on every kept job.
+Filter the raw WhatsApp job postings using the user's local job profile. Keep only jobs that match the profile, and always write `send: false` on every kept job.
 
 ## Required Workflow
 
@@ -15,9 +15,8 @@ Filter the raw WhatsApp job postings using the user's local job profile. Keep on
 2. Read and validate `output/jobs-email.json`.
 3. Compare each item in `jobs` against the profile.
 4. Keep only jobs that clearly match the profile.
-5. For each kept job, derive `hasEmail` only from whether `text` contains an email-like address.
-6. Write `output/filtered-jobs.json` with the required schema.
-7. Report `sourceTotal`, `total`, the count with `hasEmail: true`, and the output path.
+5. Write `output/filtered-jobs.json` with the required schema.
+6. Report `sourceTotal`, `total`, and the output path.
 
 Do not call WhatsApp, Evolution API, databases, or Docker volumes. This skill only filters the local JSON file already produced by the search workflow.
 
@@ -54,9 +53,6 @@ Each kept job must preserve its original fields, including `sender`, `text`, and
 - Keep a job only when the role, seniority, stack, work mode, language, and reject rules are compatible with the profile.
 - Reject jobs that hit the profile's explicit rejection rules, even if one keyword looks relevant.
 - If the profile still contains placeholders, use the filled sections and treat empty placeholder sections as unknown, not as matching criteria.
-- `hasEmail` is not part of profile matching. Add it after deciding that the job matches the profile.
-- Set `hasEmail: true` only when the kept job text contains an email-like address such as `name@example.com`; otherwise set `hasEmail: false`.
-- Do not infer whether the email is application-related while filtering. The send workflow validates that later.
 
 ## Output File
 
@@ -79,8 +75,7 @@ Required schema:
       "sender": "Job Channel",
       "text": "Job text that matches the profile...",
       "timestamp": 1785939280,
-      "send": false,
-      "hasEmail": true
+      "send": false
     }
   ]
 }
@@ -95,8 +90,6 @@ Field rules:
 - `jobs` contains only compatible jobs.
 - `send` must be added to every kept job.
 - `send` must always be `false`; never set it to `true`.
-- `hasEmail` must be added to every kept job as a boolean.
-- `hasEmail` must be derived only from `jobs[].text` containing an email-like address.
 - Do not add a `reason` field.
 
 If no jobs match, write a valid empty result:
@@ -116,7 +109,7 @@ If no jobs match, write a valid empty result:
 After writing the file, validate it:
 
 ```bash
-node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JSON.parse(fs.readFileSync(p,"utf8")); if (typeof j.lastRun !== "string" || typeof j.hoursConsulted !== "number" || typeof j.sourceTotal !== "number" || typeof j.total !== "number" || !Array.isArray(j.jobs)) process.exit(1); if (j.total !== j.jobs.length) process.exit(1); if (j.jobs.some((job)=>typeof job.sender !== "string" || typeof job.text !== "string" || typeof job.timestamp !== "number" || job.send !== false || typeof job.hasEmail !== "boolean" || Object.prototype.hasOwnProperty.call(job,"reason"))) process.exit(1); console.log(JSON.stringify({ sourceTotal: j.sourceTotal, total: j.total, withEmail: j.jobs.filter((job)=>job.hasEmail === true).length }, null, 2));'
+node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JSON.parse(fs.readFileSync(p,"utf8")); if (typeof j.lastRun !== "string" || typeof j.hoursConsulted !== "number" || typeof j.sourceTotal !== "number" || typeof j.total !== "number" || !Array.isArray(j.jobs)) process.exit(1); if (j.total !== j.jobs.length) process.exit(1); if (j.jobs.some((job)=>typeof job.sender !== "string" || typeof job.text !== "string" || typeof job.timestamp !== "number" || job.send !== false || Object.prototype.hasOwnProperty.call(job,"reason"))) process.exit(1); console.log(JSON.stringify({ sourceTotal: j.sourceTotal, total: j.total }, null, 2));'
 ```
 
 ## Quick Reference
@@ -128,8 +121,6 @@ node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JS
 | Job clearly matches the profile | Keep it and set `send: false` |
 | Job weakly or ambiguously matches | Exclude it |
 | Job hits a reject rule | Exclude it |
-| Kept job text contains an email-like address | Set `hasEmail: true` |
-| Kept job text does not contain an email-like address | Set `hasEmail: false` |
 | No jobs match | Write `total: 0` and `jobs: []` |
 
 ## Common Mistakes
@@ -140,6 +131,5 @@ node -e 'const fs=require("fs"); const p="output/filtered-jobs.json"; const j=JS
 - Do not invent output paths; use `output/filtered-jobs.json`.
 - Do not keep incompatible jobs for auditing; the output contains only compatible jobs.
 - Do not set `send: true` for any reason.
-- Do not omit `hasEmail` from kept jobs.
 - Do not add `reason`, score, or explanation fields to jobs.
 - Do not modify `output/jobs-email.json`.

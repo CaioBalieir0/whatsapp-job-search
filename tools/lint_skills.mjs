@@ -21,14 +21,6 @@ export function lintSkills({ skills, opencodeConfig }) {
     if (skillName === 'setup-job-profile' && !hasWhatsAppSourceSetupGuidance(content)) {
       errors.push('.claude/skills/setup-job-profile/SKILL.md must guide WhatsApp QR Code login and profile/whatsapp-sources.json JID setup');
     }
-
-    if (skillName === 'filter-whatsapp-jobs' && !hasFilteredJobEmailEligibilityGuidance(content)) {
-      errors.push('.claude/skills/filter-whatsapp-jobs/SKILL.md must add and validate hasEmail on filtered jobs');
-    }
-
-    if (skillName === 'send-job-emails' && !hasEmailEligibleSelectionGuidance(content)) {
-      errors.push('.claude/skills/send-job-emails/SKILL.md must require user selection from pending jobs with hasEmail: true before file-backed sending');
-    }
   }
 
   for (const [commandName, command] of Object.entries(opencodeConfig.command ?? {})) {
@@ -56,14 +48,6 @@ function hasWhatsAppConnectionGuidance(content) {
 
 function hasWhatsAppSourceSetupGuidance(content) {
   return /QR Code/.test(content) && /profile\/whatsapp-sources\.json/.test(content) && /\bJID\b|\bjid\b/.test(content);
-}
-
-function hasFilteredJobEmailEligibilityGuidance(content) {
-  return /hasEmail/.test(content) && /email-like address/.test(content) && /job\.hasEmail !== "boolean"/.test(content);
-}
-
-function hasEmailEligibleSelectionGuidance(content) {
-  return /hasEmail: true/.test(content) && /ask the user to choose/.test(content) && /todas/.test(content);
 }
 
 function loadRepositoryInputs(rootDir) {
